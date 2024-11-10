@@ -181,12 +181,14 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 		if(len(result) < 2) {
 			fmt.Println("Minimum args req are 2")
 		} else {
-			key := string(result[1].Data);
-			vt, ok := server.databse[key]		
+			vt, ok := server.databse[string(result[1].Data)]		
 			if ok {
-				if vt.tickUnixNanoSec  == -1 || vt.tickUnixNanoSec < time.Now().UnixNano() {
+				currTime := time.Now().UnixNano();				
+				if vt.tickUnixNanoSec  == -1 || vt.tickUnixNanoSec < currTime {
 					out += "$" + strconv.Itoa(len(vt.value)) + "\r\n" + vt.value + "\r\n"
 				} else {
+					fmt.Println("Current time: ", currTime);
+					fmt.Println("vt.timeout: ", vt.tickUnixNanoSec)
 					out += "$-1\r\n"					
 				}
 			} else {
