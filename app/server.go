@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -16,13 +17,18 @@ type ByteIntPair struct {
     Value int	//!1 for bulk string, 2 for integer, 3 for simple string
 }
 
+type ValueTickPair struct {
+	value string
+	tickUnixNanoSec int64
+}
+
 //!Create a reddis server
 type RedisServer struct {
 	listener    net.Listener
 	clients     map[int]net.Conn
 	pollFds     map[int]unix.PollFd
 	requestResponseBuffer map[int][]byte
-	databse map[string]string
+	databse map[string]ValueTickPair
 }
 
 //!Constructor
@@ -37,7 +43,7 @@ func NewRedisServer(address string) (*RedisServer, error) {
 		clients:      make(map[int]net.Conn),
 		pollFds:      make(map[int]unix.PollFd),
 		requestResponseBuffer: make(map[int][]byte),
-		databse:  make(map[string]string),
+		databse:  make(map[string]ValueTickPair),
 	}, nil
 }
 
@@ -152,7 +158,23 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 		} else {
 			key := string(result[1].Data);
 			value := string(result[2].Data);
-			server.databse[key] = value;
+
+			//!Check if information of time present
+			var vt ValueTickPair;
+			vt.value = value;
+			if len(result) > 3 {	//!Time included
+				timeUnit := strings.ToLower(string(result[3].Data))
+				timeDuration, _ := strconv.Atoi(string(result[4].Data))
+				if(timeUnit == "px") {
+					timeDuration = timeDuration * 1000000;	//!Mili to nano seconds
+				} else {
+					fmt.Println("Time unit not known");					
+				}
+				vt.tickUnixNanoSec = time.Now().UnixNano() + int64(timeDuration); 
+			} else {
+				vt.tickUnixNanoSec = -1;	//!Never expires
+			}
+			server.databse[key] = vt;
 			out += "+" + "OK" + "\r\n"			
 		}
 	case "get":
@@ -160,9 +182,13 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 			fmt.Println("Minimum args req are 2")
 		} else {
 			key := string(result[1].Data);
-			value, ok := server.databse[key]
+			vt, ok := server.databse[key]		
 			if ok {
-				out += "$" + strconv.Itoa(len(value)) + "\r\n" + value + "\r\n"
+				if vt.tickUnixNanoSec  == -1 || vt.tickUnixNanoSec < time.Now().UnixNano() {
+					out += "$" + strconv.Itoa(len(vt.value)) + "\r\n" + vt.value + "\r\n"
+				} else {
+					out += "$-1\r\n"					
+				}
 			} else {
 				out += "$-1\r\n"
 			}
