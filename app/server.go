@@ -184,7 +184,7 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 			vt, ok := server.databse[string(result[1].Data)]		
 			if ok {
 				currTime := time.Now().UnixNano();				
-				if vt.tickUnixNanoSec  == -1 || vt.tickUnixNanoSec < currTime {
+				if vt.tickUnixNanoSec  == -1 || vt.tickUnixNanoSec > currTime {
 					out += "$" + strconv.Itoa(len(vt.value)) + "\r\n" + vt.value + "\r\n"
 				} else {
 					fmt.Println("Current time: ", currTime);
