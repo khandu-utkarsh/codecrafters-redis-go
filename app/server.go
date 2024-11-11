@@ -29,6 +29,11 @@ type RedisServer struct {
 	pollFds     map[int]unix.PollFd
 	requestResponseBuffer map[int][]byte
 	databse map[string]ValueTickPair
+
+	//!Configs for rdb persistence
+	rdbDirPath string
+	rdbFileName string
+
 }
 
 //!Constructor
@@ -85,6 +90,21 @@ func GetTCPConnectionFd(tcpConn *net.TCPConn) (uintptr, error) {
 		return 0, err
 	}
 	return fd, nil	
+}
+
+func createBulkString(inp string) (string) {
+	return "$" + strconv.Itoa(len(inp)) + "\r\n" + string(inp) + "\r\n"
+}
+
+func createRESPArray(inparray []string) (string) {
+	out := "*";
+	out += strconv.Itoa(len(inparray));
+	out += "\r\n";
+	for _, elem := range inparray {
+		out += elem;
+	}
+	return out;
+
 }
 
 // RequestHandler processes the input and returns the response
@@ -151,7 +171,7 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 			}
 			obytes = append(obytes, elem.Data...)
 		}
-		out += "$" + strconv.Itoa(len(obytes)) + "\r\n" + string(obytes) + "\r\n"
+		out += createBulkString(string(obytes));
 	case "set":
 		if(len(result) < 3) {
 			fmt.Println("Minimum args req are 3")
@@ -185,7 +205,7 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 			if ok {
 				currTime := time.Now().UnixNano();				
 				if vt.tickUnixNanoSec  == -1 || vt.tickUnixNanoSec > currTime {
-					out += "$" + strconv.Itoa(len(vt.value)) + "\r\n" + vt.value + "\r\n"
+					out += createBulkString(vt.value);
 				} else {
 					fmt.Println("Current time: ", currTime);
 					fmt.Println("vt.timeout: ", vt.tickUnixNanoSec)
@@ -195,7 +215,24 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 				out += "$-1\r\n"
 			}
 		}
-
+	case "config":
+		if(len(result) < 3) {
+			fmt.Println("Minimum args req are 3 for config")
+		} else {
+			if strings.ToLower(string(result[1].Data)) == "get" && string(result[2].Data) == "dir" {
+				oa := make([]string, 2)
+				oa[0] = createBulkString("dir");
+				oa[1] = createBulkString(server.rdbDirPath);
+				out += createRESPArray(oa);
+			} else if strings.ToLower(string(result[1].Data)) == "get" && string(result[2].Data) == "dbfilename" { 
+				oa := make([]string, 2)
+				oa[0] = createBulkString("dbfilename");
+				oa[1] = createBulkString(server.rdbFileName);
+				out += createRESPArray(oa);
+			} else {
+				fmt.Println("Nothing implemented for this value of config");				
+			}
+		}
 	default:
 		fmt.Println("Not yet implemented for, ", cmdName);
 	}
@@ -267,6 +304,7 @@ func (server *RedisServer) eventLoopStart() {
 						delete(server.clients, fd)
 						delete(server.pollFds, fd) // Remove from pollFds
 					} else {
+						//fmt.Println("Read data is: ", string(buffer))
 						outbytes, _ := server.RequestHandler(buffer[:n])
 						server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)
 					}
@@ -288,11 +326,33 @@ func (server *RedisServer) eventLoopStart() {
 
 func main() {
 
+	cmdArgs := os.Args[1:];
+
+	var dirName string;
+	var rdbFileName string;
+	for index, arg := range cmdArgs {
+		switch arg {
+		case "--dir":
+			dirName = cmdArgs[index + 1];			
+		case "--dbfilename":
+			rdbFileName = cmdArgs[index + 1];
+		default:
+			continue;
+		}
+	}
+
+	fmt.Println("Printing all the cmd line arguments")
+	fmt.Println(cmdArgs)
+
+
 	server, err := NewRedisServer(":6379")
     if err != nil {
         fmt.Println("Error listening on port 6379:", err)
         os.Exit(1)
     }
+	//!Setting the rdb params:
+	server.rdbDirPath = dirName;
+	server.rdbFileName = rdbFileName;
     defer server.listener.Close()
 	server.eventLoopStart();
 }
