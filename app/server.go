@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -243,6 +244,16 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 
 
 func (server *RedisServer) eventLoopStart() {
+
+	//!Before starting the server let's load the rdb file and populate the cache databse.
+
+	rdbManager := &RDBFileManager{
+						directoryPath : server.rdbDirPath,
+						dbName : server.rdbFileName,
+					}
+
+	rdbManager.LoadDatabase(server);
+
 	// Add listener FD to pollFds for read events
 	listenerFd, _ := GetTCPListenerFd(server.listener.(*net.TCPListener))
 	lfd := int(listenerFd)
@@ -328,9 +339,12 @@ func (server *RedisServer) eventLoopStart() {
 type RDBFileManager struct {
 	directoryPath string
 	dbName string
+
+	//!We can add buffer, running index and all. It will make this process quite smoother.
 }
 
-func (rdbFileManager * RDBFileManager) parseLengthPrefixedData(data []byte) (interface{}, string, int64) {
+//!For our case this is the assumption that everything will either be string or integer coded.
+func (rdbFileManager * RDBFileManager) parseEncodedData(data []byte) (interface{}, string, int64) {
 
 	//!These will the be output
 	var readData interface{};
@@ -384,7 +398,33 @@ func (rdbFileManager * RDBFileManager) parseLengthPrefixedData(data []byte) (int
 }
 
 func (rdbFileManager * RDBFileManager) LoadDatabase(server *RedisServer) {
-	fmt.Println("Yet to be implemented...")
+
+	//!Read file
+	rdbHandle, err := os.Open(filepath.Join(server.rdbDirPath, server.rdbFileName));
+	if err != nil {
+		fmt.Println("Not able to read file at: ", filepath.Join(server.rdbDirPath, server.rdbFileName));
+	}
+
+	//!Let's first 1024 bytes and then we will keep on reading till we encounter end of file information
+	var prevBuffer []byte;
+	begin := int64(0);
+	end := int64(1024);
+	for {
+		rawData := make([]byte, end);
+		rdbHandle.ReadAt(rawData, begin);
+	
+		// for i := begin; i < end ; {
+		// 	if(rawData[i] == 0xFE) {
+		// 		func (rdbFileManager * r) parseEncodedData(data []byte) (interface{}, string, int64) {
+		// 	}
+		// }
+
+
+		break;	//!Remove this.
+	}
+	_ = prevBuffer;
+
+
 }
 
 
