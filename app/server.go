@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
@@ -322,6 +323,69 @@ func (server *RedisServer) eventLoopStart() {
 	}
 }
 
+
+//!RDB File Manager
+type RDBFileManager struct {
+	directoryPath string
+	dbName string
+}
+
+func (rdbFileManager * RDBFileManager) parseLengthPrefixedData(data []byte) (interface{}, string, int64) {
+
+	//!These will the be output
+	var readData interface{};
+	var dataType string;
+	var nextByteIndex int64;
+
+
+
+	//!Extracting the first byte of the data
+	firstByte := make([]byte, 1)
+	copy(firstByte, data[0:0])
+
+	//!Fetching the 2 most significant bits
+	encodedVal := int64(firstByte[0]) >> 6;
+	switch encodedVal {
+		case 0: // 6-bit length	//! 00 binary form
+			len := int64(data[0] & 0x3F)
+			readData = string(data[1: 1 + len]);			
+			dataType = "string"
+			nextByteIndex = 1 + len;
+		case 1: // 14-bit length	//! 01 binary form
+			len := int64(int64(data[0] & 0x3F) << 8) | int64(data[1])
+			readData = string(data[2: 2 + len]);			
+			dataType = "string"
+			nextByteIndex = 2 + len;
+		case 2: // 32-bit length	//! 10 binary form
+			len := int64(binary.BigEndian.Uint32(data[1:5]))
+			readData = string(data[5: 5 + len]);			
+			dataType = "string"
+			nextByteIndex = 5 + len;
+		case 3: // !  11 binary form
+			whatFollows := int64(data[0] & 0x3F)
+			switch(whatFollows) {
+				case 0:
+					readData = int64(data[1]);
+					dataType = "int64"
+					nextByteIndex = 2;
+				case 1:
+					readData = int64(binary.BigEndian.Uint16(data[1:3]))
+					dataType = "int64"
+					nextByteIndex = 3;
+				case 2:
+					readData = int64(binary.BigEndian.Uint32(data[1:5]))
+					dataType = "int64"
+					nextByteIndex = 5;
+			}
+		default:
+			fmt.Println("No implementation yet for the remaining...")
+	}
+	return  readData,  dataType, nextByteIndex;
+}
+
+func (rdbFileManager * RDBFileManager) LoadDatabase(server *RedisServer) {
+	fmt.Println("Yet to be implemented...")
+}
 
 
 func main() {
