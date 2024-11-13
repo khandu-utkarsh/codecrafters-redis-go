@@ -344,6 +344,7 @@ type RDBFileManager struct {
 
 // parseEncodedData parses length-prefixed data, supporting multiple formats.
 func (rdb *RDBFileManager) parseEncodedData(data []byte) (interface{}, string, int64) {
+	fmt.Println("Just printing all the data; ", data)
 	var readData interface{}
 	var dataType string
 	var nextByteIndex int64
@@ -353,18 +354,23 @@ func (rdb *RDBFileManager) parseEncodedData(data []byte) (interface{}, string, i
 
 	switch encodedVal {
 	case 0: // 6-bit length
+	fmt.Println("Should enter here:")
 		len := int64(firstByte & 0x3F)
+		fmt.Println("Length is: ", len)
 		readData = string(data[1 : 1+len])
+		fmt.Println("RD1 : ", readData)
 		dataType = "string"
 		nextByteIndex = 1 + len
 	case 1: // 14-bit length
 		len := int64(firstByte&0x3F)<<8 | int64(data[1])
 		readData = string(data[2 : 2+len])
+		fmt.Println("RD2 : ", readData)
 		dataType = "string"
 		nextByteIndex = 2 + len
 	case 2: // 32-bit length
 		len := int64(binary.BigEndian.Uint32(data[1:5]))
 		readData = string(data[5 : 5+len])
+		fmt.Println("RD3 : ", readData)
 		dataType = "string"
 		nextByteIndex = 5 + len
 	case 3: // Integer types
@@ -427,7 +433,7 @@ func (rdb *RDBFileManager) parseDictEntry(data []byte) (string, ValueTickPair, i
 func (rdb *RDBFileManager) processDatabaseSelector(data []byte) (int64, int64) {
 	parsedData, dataType, nextIndex := rdb.parseEncodedData(data)
 	if dataType != "int64" {
-		fmt.Println("Database selector should be int64, but got:", dataType)
+		fmt.Println("Database selector should be int64, but got:", dataType, " value of the data is: ", parsedData.(string))
 	}
 	return parsedData.(int64), nextIndex
 }
@@ -435,6 +441,8 @@ func (rdb *RDBFileManager) processDatabaseSelector(data []byte) (int64, int64) {
 // processHashTableSizes extracts the main and expiring hash table sizes.
 func (rdb *RDBFileManager) processHashTableSizes(data []byte) (int64, int64, int64) {
 	mainSize, _, offset := rdb.parseEncodedData(data)
+	fmt.Println("Main size is:", mainSize.(string))
+
 	expiringSize, _, nextOffset := rdb.parseEncodedData(data[offset:])
 	return mainSize.(int64), expiringSize.(int64), offset + nextOffset
 }
@@ -458,6 +466,7 @@ func (rdb *RDBFileManager) parseEntry(buffer []byte, server *RedisServer) int64 
 	vt.tickUnixNanoSec = expiration
 	i += bytesRead
 	server.databse[key] = vt
+	fmt.Println("parsed entry | key: ", key, " value: ", vt.value, " expiry in ns: ", vt.tickUnixNanoSec);
 	return i
 }
 
@@ -465,6 +474,7 @@ func (rdb *RDBFileManager) parseEntry(buffer []byte, server *RedisServer) int64 
 
 func (rdb * RDBFileManager) LoadDatabase(server *RedisServer) {
 	filePath := filepath.Join(server.rdbDirPath, server.rdbFileName)
+	fmt.Println("loading file: ", filePath)
 	rdbFile, err := os.Open(filePath)
 	if err != nil {
 		fmt.Println("Unable to open file at:", filePath)
@@ -477,28 +487,39 @@ func (rdb * RDBFileManager) LoadDatabase(server *RedisServer) {
 	const chunkSize int64 = 1024
 	hashtableStarted := false
 
+	iteration := 0;
 	for {
+		fmt.Println("Iteration: ", iteration);
+		iteration++;
+
 		rawData := make([]byte, chunkSize)
 		n, err := rdbFile.ReadAt(rawData, readPosition)
-		if err != nil {
+		if n == 0 {
 			fmt.Println("Error reading file:", err)
 			break
 		}
+		rawData = rawData[:n];
+		fmt.Println("Bytes read are : ", n, "Dumping all the data: " );
+		fmt.Println(rawData);
 
 		buffer = append(buffer, rawData...)
 		readPosition += int64(n)
 
+		fmt.Println("Entering in bytes parsing loop...")
 		//!Go over each byte till we encounter database selector
 		for i := int64(0); i < int64(len(buffer)); {
+
 			br := int64(0)
-			if buffer[i] == 0xFE && !hashtableStarted {
-				rdb.databaseSelector, br = rdb.processDatabaseSelector(buffer[i + 1:])
-				i += 1 + br
-				continue
-			}
+			// if buffer[i] == 0xFE && !hashtableStarted {
+			// 	fmt.Println("Read db selector")
+			// 	rdb.databaseSelector, br = rdb.processDatabaseSelector(buffer[i + 1:])
+			// 	i += 1 + br
+			// 	continue
+			// }
 
 			if buffer[i] == 0xFB && !hashtableStarted {
 				rdb.hashTableSize, rdb.expiringHashTableSize, br = rdb.processHashTableSizes(buffer[i + 1:])
+				fmt.Println("Read the hash table: hts: ", rdb.hashTableSize, " expiring hash table: ", rdb.expiringHashTableSize);
 				i += 1 + br
 				hashtableStarted = true
 				continue
@@ -508,6 +529,7 @@ func (rdb * RDBFileManager) LoadDatabase(server *RedisServer) {
 				br = rdb.parseEntry(buffer[i:], server)
 				i += br;
 			}
+			i++;
 		}
 
 		if n < int(chunkSize) {
