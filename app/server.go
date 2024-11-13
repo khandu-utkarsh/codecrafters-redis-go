@@ -35,7 +35,6 @@ type RedisServer struct {
 	//!Configs for rdb persistence
 	rdbDirPath string
 	rdbFileName string
-
 }
 
 //!Constructor
@@ -334,95 +333,188 @@ func (server *RedisServer) eventLoopStart() {
 	}
 }
 
-
-//!RDB File Manager
+// RDBFileManager handles Redis Database (RDB) file parsing.
 type RDBFileManager struct {
-	directoryPath string
-	dbName string
-
-	//!We can add buffer, running index and all. It will make this process quite smoother.
+	directoryPath         string
+	dbName                string
+	databaseSelector      int64
+	hashTableSize         int64
+	expiringHashTableSize int64
 }
 
-//!For our case this is the assumption that everything will either be string or integer coded.
-func (rdbFileManager * RDBFileManager) parseEncodedData(data []byte) (interface{}, string, int64) {
+// parseEncodedData parses length-prefixed data, supporting multiple formats.
+func (rdb *RDBFileManager) parseEncodedData(data []byte) (interface{}, string, int64) {
+	var readData interface{}
+	var dataType string
+	var nextByteIndex int64
 
-	//!These will the be output
-	var readData interface{};
-	var dataType string;
-	var nextByteIndex int64;
+	firstByte := data[0]
+	encodedVal := int64(firstByte) >> 6
 
-
-
-	//!Extracting the first byte of the data
-	firstByte := make([]byte, 1)
-	copy(firstByte, data[0:0])
-
-	//!Fetching the 2 most significant bits
-	encodedVal := int64(firstByte[0]) >> 6;
 	switch encodedVal {
-		case 0: // 6-bit length	//! 00 binary form
-			len := int64(data[0] & 0x3F)
-			readData = string(data[1: 1 + len]);			
-			dataType = "string"
-			nextByteIndex = 1 + len;
-		case 1: // 14-bit length	//! 01 binary form
-			len := int64(int64(data[0] & 0x3F) << 8) | int64(data[1])
-			readData = string(data[2: 2 + len]);			
-			dataType = "string"
-			nextByteIndex = 2 + len;
-		case 2: // 32-bit length	//! 10 binary form
-			len := int64(binary.BigEndian.Uint32(data[1:5]))
-			readData = string(data[5: 5 + len]);			
-			dataType = "string"
-			nextByteIndex = 5 + len;
-		case 3: // !  11 binary form
-			whatFollows := int64(data[0] & 0x3F)
-			switch(whatFollows) {
-				case 0:
-					readData = int64(data[1]);
-					dataType = "int64"
-					nextByteIndex = 2;
-				case 1:
-					readData = int64(binary.BigEndian.Uint16(data[1:3]))
-					dataType = "int64"
-					nextByteIndex = 3;
-				case 2:
-					readData = int64(binary.BigEndian.Uint32(data[1:5]))
-					dataType = "int64"
-					nextByteIndex = 5;
-			}
-		default:
-			fmt.Println("No implementation yet for the remaining...")
+	case 0: // 6-bit length
+		len := int64(firstByte & 0x3F)
+		readData = string(data[1 : 1+len])
+		dataType = "string"
+		nextByteIndex = 1 + len
+	case 1: // 14-bit length
+		len := int64(firstByte&0x3F)<<8 | int64(data[1])
+		readData = string(data[2 : 2+len])
+		dataType = "string"
+		nextByteIndex = 2 + len
+	case 2: // 32-bit length
+		len := int64(binary.BigEndian.Uint32(data[1:5]))
+		readData = string(data[5 : 5+len])
+		dataType = "string"
+		nextByteIndex = 5 + len
+	case 3: // Integer types
+		whatFollows := int64(firstByte & 0x3F)
+		readData, dataType, nextByteIndex = rdb.parseIntegerData(data[1:], whatFollows)
+	default:
+		fmt.Println("Unhandled encoding type.")
 	}
-	return  readData,  dataType, nextByteIndex;
+
+	return readData, dataType, nextByteIndex
 }
 
-func (rdbFileManager * RDBFileManager) LoadDatabase(server *RedisServer) {
+// parseIntegerData handles integer data types based on a type identifier.
+func (rdb *RDBFileManager) parseIntegerData(data []byte, dataTypeID int64) (int64, string, int64) {
+	var result int64
+	var nextByteIndex int64
 
-	//!Read file
-	rdbHandle, err := os.Open(filepath.Join(server.rdbDirPath, server.rdbFileName));
+	switch dataTypeID {
+	case 0:
+		result = int64(data[0])
+		nextByteIndex = 1
+	case 1:
+		result = int64(binary.BigEndian.Uint16(data[:2]))
+		nextByteIndex = 2
+	case 2:
+		result = int64(binary.BigEndian.Uint32(data[:4]))
+		nextByteIndex = 4
+	default:
+		fmt.Println("Unknown integer type")
+	}
+
+	return result, "int64", nextByteIndex
+}
+
+// parseDictEntry extracts a dictionary entry, including key and value with expiration.
+func (rdb *RDBFileManager) parseDictEntry(data []byte) (string, ValueTickPair, int64) {
+	var bytesRead int64 = 1
+	var key string
+	var vt ValueTickPair
+
+	valueType := data[0]
+	if valueType != 0 {
+		fmt.Println("Unsupported value type, expecting string.")
+		return "", vt, bytesRead
+	}
+
+	strKey, _, keyLen := rdb.parseEncodedData(data[bytesRead:])
+	bytesRead += keyLen
+	key = string(data[bytesRead : bytesRead+strKey.(int64)])
+	bytesRead += strKey.(int64)
+	strValue, _, valueLen := rdb.parseEncodedData(data[bytesRead: ])
+	bytesRead += valueLen
+	vt.value = string(data[bytesRead : bytesRead+strValue.(int64)])
+	bytesRead += strValue.(int64)
+
+	return key, vt, bytesRead
+}
+
+// processDatabaseSelector processes the database selector entry in the RDB file.
+func (rdb *RDBFileManager) processDatabaseSelector(data []byte) (int64, int64) {
+	parsedData, dataType, nextIndex := rdb.parseEncodedData(data)
+	if dataType != "int64" {
+		fmt.Println("Database selector should be int64, but got:", dataType)
+	}
+	return parsedData.(int64), nextIndex
+}
+
+// processHashTableSizes extracts the main and expiring hash table sizes.
+func (rdb *RDBFileManager) processHashTableSizes(data []byte) (int64, int64, int64) {
+	mainSize, _, offset := rdb.parseEncodedData(data)
+	expiringSize, _, nextOffset := rdb.parseEncodedData(data[offset:])
+	return mainSize.(int64), expiringSize.(int64), offset + nextOffset
+}
+
+// parseEntry processes individual entries in the hash table, including expiration.
+func (rdb *RDBFileManager) parseEntry(buffer []byte, server *RedisServer) int64 {
+	var expiration int64
+	i := int64(0);
+	switch buffer[i] {
+	case 0xFD:
+		expiration = int64(binary.BigEndian.Uint32(buffer[1:5])) * 1e9
+		i += 5
+	case 0xFC:
+		expiration = int64(binary.BigEndian.Uint64(buffer[1:9])) * 1e6
+		i += 9
+	default:
+		expiration = -1
+	}
+
+	key, vt, bytesRead := rdb.parseDictEntry(buffer[i:])
+	vt.tickUnixNanoSec = expiration
+	i += bytesRead
+	server.databse[key] = vt
+	return i
+}
+
+
+
+func (rdb * RDBFileManager) LoadDatabase(server *RedisServer) {
+	filePath := filepath.Join(server.rdbDirPath, server.rdbFileName)
+	rdbFile, err := os.Open(filePath)
 	if err != nil {
-		fmt.Println("Not able to read file at: ", filepath.Join(server.rdbDirPath, server.rdbFileName));
+		fmt.Println("Unable to open file at:", filePath)
+		return
 	}
+	defer rdbFile.Close()
 
-	//!Let's first 1024 bytes and then we will keep on reading till we encounter end of file information
-	var prevBuffer []byte;
-	begin := int64(0);
-	end := int64(1024);
+	var buffer []byte
+	readPosition := int64(0)
+	const chunkSize int64 = 1024
+	hashtableStarted := false
+
 	for {
-		rawData := make([]byte, end);
-		rdbHandle.ReadAt(rawData, begin);
-	
-		// for i := begin; i < end ; {
-		// 	if(rawData[i] == 0xFE) {
-		// 		func (rdbFileManager * r) parseEncodedData(data []byte) (interface{}, string, int64) {
-		// 	}
-		// }
+		rawData := make([]byte, chunkSize)
+		n, err := rdbFile.ReadAt(rawData, readPosition)
+		if err != nil {
+			fmt.Println("Error reading file:", err)
+			break
+		}
 
+		buffer = append(buffer, rawData...)
+		readPosition += int64(n)
 
-		break;	//!Remove this.
+		//!Go over each byte till we encounter database selector
+		for i := int64(0); i < int64(len(buffer)); {
+			br := int64(0)
+			if buffer[i] == 0xFE && !hashtableStarted {
+				rdb.databaseSelector, br = rdb.processDatabaseSelector(buffer[i + 1:])
+				i += 1 + br
+				continue
+			}
+
+			if buffer[i] == 0xFB && !hashtableStarted {
+				rdb.hashTableSize, rdb.expiringHashTableSize, br = rdb.processHashTableSizes(buffer[i + 1:])
+				i += 1 + br
+				hashtableStarted = true
+				continue
+			}
+
+			if hashtableStarted {
+				br = rdb.parseEntry(buffer[i:], server)
+				i += br;
+			}
+		}
+
+		if n < int(chunkSize) {
+			fmt.Println("File read completed.")
+			break
+		}
 	}
-	_ = prevBuffer;
 
 
 }
