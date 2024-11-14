@@ -443,10 +443,10 @@ func (rdb *RDBFileManager) parseEntry(buffer []byte, server *RedisServer) int64 
 	i := int64(0);
 	switch buffer[i] {
 	case 0xFD:
-		expiration = int64(binary.BigEndian.Uint32(buffer[1:5])) * 1e9
+		expiration = int64(binary.LittleEndian.Uint32(buffer[1:5])) * 1e9	//!These are little endian and not big. Tests failing with bigEndian system
 		i += 5
 	case 0xFC:
-		expiration = int64(binary.BigEndian.Uint64(buffer[1:9])) * 1e6
+		expiration = int64(binary.LittleEndian.Uint64(buffer[1:9])) * 1e6	//!These are little endian and not big 
 		i += 9
 	default:
 		expiration = -1
