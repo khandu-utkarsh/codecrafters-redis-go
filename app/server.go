@@ -343,66 +343,53 @@ type RDBFileManager struct {
 }
 
 // parseEncodedData parses length-prefixed data, supporting multiple formats.
-func (rdb *RDBFileManager) parseEncodedData(data []byte) (interface{}, string, int64) {
-	fmt.Println("Just printing all the data; ", data)
-	var readData interface{}
-	var dataType string
-	var nextByteIndex int64
+func (rdb *RDBFileManager) parseEncodedLength(data []byte) (int64, int64) {
+	//fmt.Println("Just printing all the data; ", data)
+
+	var encodedLength int64
+	var bytesRead int64
 
 	firstByte := data[0]
 	encodedVal := int64(firstByte) >> 6
 
 	switch encodedVal {
 	case 0: // 6-bit length
-	fmt.Println("Should enter here:")
-		len := int64(firstByte & 0x3F)
-		fmt.Println("Length is: ", len)
-		readData = string(data[1 : 1+len])
-		fmt.Println("RD1 : ", readData)
-		dataType = "string"
-		nextByteIndex = 1 + len
+		encodedLength = int64(firstByte & 0x3F)
+		bytesRead = int64(1);
 	case 1: // 14-bit length
-		len := int64(firstByte&0x3F)<<8 | int64(data[1])
-		readData = string(data[2 : 2+len])
-		fmt.Println("RD2 : ", readData)
-		dataType = "string"
-		nextByteIndex = 2 + len
+		encodedLength = int64(firstByte&0x3F)<<8 | int64(data[1])
+		bytesRead = int64(2);
 	case 2: // 32-bit length
-		len := int64(binary.BigEndian.Uint32(data[1:5]))
-		readData = string(data[5 : 5+len])
-		fmt.Println("RD3 : ", readData)
-		dataType = "string"
-		nextByteIndex = 5 + len
-	case 3: // Integer types
-		whatFollows := int64(firstByte & 0x3F)
-		readData, dataType, nextByteIndex = rdb.parseIntegerData(data[1:], whatFollows)
+		fmt.Println("Reached here, confirm the endian system")
+		encodedLength = int64(binary.BigEndian.Uint32(data[1:5]))	//!Confirm if it is little endian or big endian.
+		bytesRead = int64(4);
+	// case 3: // Integer types
+	// 	whatFollows := int64(firstByte & 0x3F)
+	// 	readData, dataType, nextByteIndex = rdb.parseIntegerData(data[1:], whatFollows)
 	default:
-		fmt.Println("Unhandled encoding type.")
+		fmt.Println("Unhandled encoding type: ", encodedVal)
 	}
-
-	return readData, dataType, nextByteIndex
+	return encodedLength, bytesRead;
 }
 
-// parseIntegerData handles integer data types based on a type identifier.
-func (rdb *RDBFileManager) parseIntegerData(data []byte, dataTypeID int64) (int64, string, int64) {
-	var result int64
-	var nextByteIndex int64
 
-	switch dataTypeID {
-	case 0:
-		result = int64(data[0])
-		nextByteIndex = 1
-	case 1:
-		result = int64(binary.BigEndian.Uint16(data[:2]))
-		nextByteIndex = 2
-	case 2:
-		result = int64(binary.BigEndian.Uint32(data[:4]))
-		nextByteIndex = 4
-	default:
-		fmt.Println("Unknown integer type")
+
+
+// parseEncodedData parses length-prefixed data, supporting multiple formats.
+func (rdb *RDBFileManager) parseEncodedString(data []byte) (string, int64) {
+	length, bytesRead := rdb.parseEncodedLength(data);
+
+	var datstr string
+	var totalBytesRead int64
+	totalBytesRead = int64(0);
+
+	totalBytesRead += bytesRead;
+	if(length == 0) {
+		return datstr, totalBytesRead;
 	}
 
-	return result, "int64", nextByteIndex
+	datstr = string(data[totalBytesRead : totalBytesRead + length])
+	return datstr, totalBytesRead + length;
 }
 
 // parseDictEntry extracts a dictionary entry, including key and value with expiration.
@@ -417,35 +404,15 @@ func (rdb *RDBFileManager) parseDictEntry(data []byte) (string, ValueTickPair, i
 		return "", vt, bytesRead
 	}
 
-	strKey, _, keyLen := rdb.parseEncodedData(data[bytesRead:])
-	bytesRead += keyLen
-	key = string(data[bytesRead : bytesRead+strKey.(int64)])
-	bytesRead += strKey.(int64)
-	strValue, _, valueLen := rdb.parseEncodedData(data[bytesRead: ])
-	bytesRead += valueLen
-	vt.value = string(data[bytesRead : bytesRead+strValue.(int64)])
-	bytesRead += strValue.(int64)
+	strKey, br1 := rdb.parseEncodedString(data[1: ])
+	strValue, br2 := rdb.parseEncodedString(data[1 + br1: ])
+	bytesRead += br1 + br2;
 
+	key = strKey;
+	vt.value = strValue;
 	return key, vt, bytesRead
 }
 
-// processDatabaseSelector processes the database selector entry in the RDB file.
-func (rdb *RDBFileManager) processDatabaseSelector(data []byte) (int64, int64) {
-	parsedData, dataType, nextIndex := rdb.parseEncodedData(data)
-	if dataType != "int64" {
-		fmt.Println("Database selector should be int64, but got:", dataType, " value of the data is: ", parsedData.(string))
-	}
-	return parsedData.(int64), nextIndex
-}
-
-// processHashTableSizes extracts the main and expiring hash table sizes.
-func (rdb *RDBFileManager) processHashTableSizes(data []byte) (int64, int64, int64) {
-	mainSize, _, offset := rdb.parseEncodedData(data)
-	fmt.Println("Main size is:", mainSize.(string))
-
-	expiringSize, _, nextOffset := rdb.parseEncodedData(data[offset:])
-	return mainSize.(int64), expiringSize.(int64), offset + nextOffset
-}
 
 // parseEntry processes individual entries in the hash table, including expiration.
 func (rdb *RDBFileManager) parseEntry(buffer []byte, server *RedisServer) int64 {
@@ -470,11 +437,9 @@ func (rdb *RDBFileManager) parseEntry(buffer []byte, server *RedisServer) int64 
 	return i
 }
 
-
-
-func (rdb * RDBFileManager) LoadDatabase(server *RedisServer) {
+func (rdb *RDBFileManager) LoadDatabase(server *RedisServer) {
 	filePath := filepath.Join(server.rdbDirPath, server.rdbFileName)
-	fmt.Println("loading file: ", filePath)
+	fmt.Println("loading file:", filePath)
 	rdbFile, err := os.Open(filePath)
 	if err != nil {
 		fmt.Println("Unable to open file at:", filePath)
@@ -482,65 +447,81 @@ func (rdb * RDBFileManager) LoadDatabase(server *RedisServer) {
 	}
 	defer rdbFile.Close()
 
+	// Assuming everything we get will fit in 1024 bytes.
 	var buffer []byte
 	readPosition := int64(0)
 	const chunkSize int64 = 1024
-	hashtableStarted := false
 
-	iteration := 0;
-	for {
-		fmt.Println("Iteration: ", iteration);
-		iteration++;
+	rawData := make([]byte, chunkSize)
+	n, err := rdbFile.ReadAt(rawData, readPosition)
+	if n == 0 {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	buffer = rawData[:n]
+	//fmt.Println("Bytes read are:", n, "Dumping all the data:")
+	//fmt.Println(buffer)
+	//fmt.Println("Printing it in hex format:")
+	// for _, elem := range buffer {
+	// 	fmt.Printf("%x ", elem);
+	// }
 
-		rawData := make([]byte, chunkSize)
-		n, err := rdbFile.ReadAt(rawData, readPosition)
-		if n == 0 {
-			fmt.Println("Error reading file:", err)
-			break
-		}
-		rawData = rawData[:n];
-		fmt.Println("Bytes read are : ", n, "Dumping all the data: " );
-		fmt.Println(rawData);
-
-		buffer = append(buffer, rawData...)
-		readPosition += int64(n)
-
-		fmt.Println("Entering in bytes parsing loop...")
-		//!Go over each byte till we encounter database selector
-		for i := int64(0); i < int64(len(buffer)); {
-
-			br := int64(0)
-			// if buffer[i] == 0xFE && !hashtableStarted {
-			// 	fmt.Println("Read db selector")
-			// 	rdb.databaseSelector, br = rdb.processDatabaseSelector(buffer[i + 1:])
-			// 	i += 1 + br
-			// 	continue
-			// }
-
-			if buffer[i] == 0xFB && !hashtableStarted {
-				rdb.hashTableSize, rdb.expiringHashTableSize, br = rdb.processHashTableSizes(buffer[i + 1:])
-				fmt.Println("Read the hash table: hts: ", rdb.hashTableSize, " expiring hash table: ", rdb.expiringHashTableSize);
-				i += 1 + br
-				hashtableStarted = true
-				continue
-			}
-
-			if hashtableStarted {
-				br = rdb.parseEntry(buffer[i:], server)
-				i += br;
-			}
-			i++;
-		}
-
-		if n < int(chunkSize) {
-			fmt.Println("File read completed.")
-			break
+	var index int64;
+	for ri, currByte := range buffer {
+		if(currByte == 0xFE) {
+			index = int64(ri);
+			break;
 		}
 	}
 
 
-}
+	currByte := buffer[index]
 
+	//!Printing after selector in hex format
+	// fmt.Println("Printing hex before selector :: ")
+	// for _, elem := range buffer[index: ] {
+	// 	fmt.Printf("%x ", elem);
+	// }
+
+
+	if(currByte == 0xFE) {
+		index++;
+		//!Printing data after finding index.
+		encodedLen, bytesRead := rdb.parseEncodedLength(buffer[index :]);
+		fmt.Println("Database selector is: ", encodedLen, " Bytes read are: ", bytesRead);
+		index += bytesRead;
+		currByte = buffer[index]
+	}
+
+	// //!Printing after selector in hex format
+	// fmt.Println("Printing hex after selector :: ")
+	// for _, elem := range buffer[index: ] {
+	// 	fmt.Printf("%x ", elem);
+	// }
+
+	if currByte == 0xFB{
+		index++;
+		fmt.Println("Printing all the data after detecting the database size op code")
+		hashTableSize, bytesRead := rdb.parseEncodedLength(buffer[index :]);
+		index += bytesRead;
+		expiringHashTableSize, bytesRead2 := rdb.parseEncodedLength(buffer[index: ]);
+		fmt.Println("Read the hash table: hts: ", hashTableSize, " expiring hash table: ", expiringHashTableSize);
+		index += bytesRead2;
+		currByte = buffer[index]		
+
+		// htCount = hashTableSize
+		// ehtCount = expiringHashTableSize
+	}  else {
+		fmt.Println("Shouldn't enter here.")
+	}
+
+	fmt.Println("Reading dic begins...")	
+	for currByte != 0xFE && currByte != 0xFF {
+		br := rdb.parseEntry(buffer[index:], server)		
+		index += br;
+		currByte = buffer[index]
+	}
+}
 
 func main() {
 
