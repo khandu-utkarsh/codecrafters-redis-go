@@ -234,6 +234,29 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 				fmt.Println("Nothing implemented for this value of config");				
 			}
 		}
+	case "keys":
+		if(len(result) < 2) {
+			fmt.Println("Minimum args req are 3 for config")
+		} else {
+			for qkindex, qkey := range result {
+				
+				if qkindex < 1 {
+					continue;
+				}
+				
+				if(string(qkey.Data) == "*") {
+					var keysout []string
+					for k, _ := range server.databse {
+						kstr := createBulkString(k);
+						keysout = append(keysout, kstr)
+					}
+					out += createRESPArray(keysout);
+				}				
+			}
+		}
+
+
+		
 	default:
 		fmt.Println("Not yet implemented for, ", cmdName);
 	}
