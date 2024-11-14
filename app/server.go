@@ -552,24 +552,30 @@ func main() {
 
 	var dirName string;
 	var rdbFileName string;
+	var port int;
+	port = 6379;	
 	for index, arg := range cmdArgs {
 		switch arg {
 		case "--dir":
 			dirName = cmdArgs[index + 1];			
 		case "--dbfilename":
 			rdbFileName = cmdArgs[index + 1];
+		case "--port":
+			port, _ = strconv.Atoi(cmdArgs[index + 1]);
 		default:
 			continue;
 		}
 	}
 
+	portString := ":" + strconv.Itoa(port);
+
 	fmt.Println("Printing all the cmd line arguments")
 	fmt.Println(cmdArgs)
 
 
-	server, err := NewRedisServer(":6379")
+	server, err := NewRedisServer(portString)
     if err != nil {
-        fmt.Println("Error listening on port 6379:", err)
+        fmt.Println("Error listening on port ", port, ": ", err)
         os.Exit(1)
     }
 	//!Setting the rdb params:
