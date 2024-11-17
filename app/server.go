@@ -644,7 +644,7 @@ func main() {
 			var out string
 			if idx == 1 {
 				oa := make([]string, 3)
-				oa[0] = messages[idx]
+				oa[0] = message
 				oa[1] = "listening-port"
 				oa[2] = strconv.Itoa(port)
 
@@ -654,7 +654,7 @@ func main() {
 				out = createRESPArray(oa);
 			} else if(idx == 2) {
 				oa := make([]string, 3)
-				oa[0] = messages[idx]
+				oa[0] = message
 				oa[1] = "capa"
 				oa[2] = "psync2"
 
@@ -664,7 +664,7 @@ func main() {
 				out = createRESPArray(oa);				
 			} else {
 				oa := make([]string, 1)
-				oa[0] = messages[idx]
+				oa[0] = message
 				oa[0] = createBulkString(oa[0]);
 				out = createRESPArray(oa);
 			}
