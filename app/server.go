@@ -168,7 +168,7 @@ func (server *RedisServer) parseInput(inputRawData []byte) ([]ByteIntPair, error
 		return nil, fmt.Errorf("invalid element count")
 	}
 	input = input[endIndex+2:]
-
+	fmt.Println("Elem count is: ", elemsCount)
 	// Parse each element in the array
 	for i := 0; i < elemsCount; i++ {
 		firstByte := input[0]
