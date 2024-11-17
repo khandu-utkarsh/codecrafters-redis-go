@@ -618,9 +618,32 @@ func main() {
 	server.rdbFileName = rdbFileName;
 
 	server.masterAddress = masterAddress;
+	if(masterAddress != "") {
+		compAdd := 	strings.Split(server.masterAddress, " ")
+		ipAdd := compAdd[0]
+		ipPort := compAdd[1]
+		masterAdd := ipAdd + ":"+ ipPort
+		//!This is a replica of some master, initiate a connection to the master
+		conn, err := net.Dial("tcp", masterAdd)
+		if err != nil {
+			fmt.Printf("Error connecting to master server: %v\n", err)
+		}
+		defer conn.Close()
+		fmt.Printf("Connected to server at %s\n", masterAdd)
 
+		//!Sending the message to the master server
+		message := "PING"
+		oa := make([]string, 1)
+		oa[0] = createBulkString(message);
+		out := createRESPArray(oa);
 
-
+		_, err = conn.Write([]byte(out))
+		if err != nil {
+			fmt.Printf("Error sending message: %v\n", err)
+			return
+		}
+		fmt.Println("Message sent:", out)
+	}
 	defer server.listener.Close()
 	server.eventLoopStart();
 }
