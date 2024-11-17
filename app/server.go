@@ -637,13 +637,37 @@ func main() {
 
 		messages := make([]string, 3)
 		messages[0] = "PING"
-		messages[1] = "REPLCONF listening-port " + strconv.Itoa(port)
-		messages[2] = "REPLCONF capa psync2"
+		messages[1] = "REPLCONF"
+		messages[2] = "REPLCONF"
 
-		for _, message := range messages {
-			oa := make([]string, 1)
-			oa[0] = createBulkString(message);
-			out := createRESPArray(oa);
+		for idx, message := range messages {
+			var out string
+			if idx == 1 {
+				oa := make([]string, 3)
+				oa[0] = messages[idx]
+				oa[1] = "listening-port"
+				oa[2] = strconv.Itoa(port)
+
+				oa[0] = createBulkString(oa[0]);
+				oa[1] = createBulkString(oa[1]);
+				oa[2] = createBulkString(oa[2]);
+				out = createRESPArray(oa);
+			} else if(idx == 2) {
+				oa := make([]string, 3)
+				oa[0] = messages[idx]
+				oa[1] = "capa"
+				oa[2] = "psync2"
+
+				oa[0] = createBulkString(oa[0]);
+				oa[1] = createBulkString(oa[1]);
+				oa[2] = createBulkString(oa[2]);
+				out = createRESPArray(oa);				
+			} else {
+				oa := make([]string, 1)
+				oa[0] = messages[idx]
+				oa[0] = createBulkString(oa[0]);
+				out = createRESPArray(oa);
+			}
 			_, err = conn.Write([]byte(out))
 			if err != nil {
 				fmt.Printf("Error sending message: %v\n", err)
