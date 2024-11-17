@@ -419,6 +419,7 @@ func (server *RedisServer) eventLoopStart() {
 				s := cmdBeginIndices[i]
 				onePastE := cmdBeginIndices[i + 1]
 				cmdB := buffer[s: onePastE]
+				fmt.Printf("%q\n", string(cmdB))
 				fmt.Println("Processing curr cmd: ", string(cmdB))
 				fmt.Println("Processing curr byt: ", cmdB)
 				parsedInput, _ := server.parseInput(cmdB);
