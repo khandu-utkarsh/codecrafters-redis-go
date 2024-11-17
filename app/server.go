@@ -118,25 +118,24 @@ func createRESPArray(inparray []string) (string) {
 
 }
 
-// RequestHandler processes the input and returns the response
-func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
+// parseInput validates and parses the input into a structured format
+func (server *RedisServer) parseInput(inputRawData []byte) ([]ByteIntPair, error) {
 	var result []ByteIntPair
-	var out string
-	var outFile []byte;
-
-	// Create a copy of the input
-	input := make([]byte, len(inputRawData))
-	copy(input, inputRawData)
 
 	// Ensure it is an array
-	if input[0] != '*' {
-		return nil, fmt.Errorf("invalid format: expected array, found %c", input[0])
+	if len(inputRawData) == 0 || inputRawData[0] != '*' {
+		return nil, fmt.Errorf("invalid format: expected array, found %c", inputRawData[0])
 	}
 
-	// Find number of elements in the array
+	// Parse the input
+	input := make([]byte, len(inputRawData))
+	copy(input, inputRawData)
 	crlfSubstr := []byte("\r\n")
 	endIndex := bytes.Index(input, crlfSubstr)
-	elemsCount, _ := strconv.Atoi(string(input[1:endIndex]))
+	elemsCount, err := strconv.Atoi(string(input[1:endIndex]))
+	if err != nil {
+		return nil, fmt.Errorf("invalid element count")
+	}
 	input = input[endIndex+2:]
 
 	// Parse each element in the array
@@ -163,6 +162,18 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 			input = input[endIndex +2 :]
 		}
 	}
+	return result, nil
+}
+
+
+
+// RequestHandler processes the input and returns the response
+func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
+	var result []ByteIntPair
+	var out string
+	var outFile []byte;
+
+	result, _ = server.parseInput(inputRawData);
 
 	if(result[0].Value == 2) {
 		fmt.Println("First element in the array encountered to be integer, look into it.")
