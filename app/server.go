@@ -214,7 +214,15 @@ func (server *RedisServer) RequestHandler(result []ByteIntPair) ([]byte, error) 
 	case "ping":
 		out += "+" + "PONG" + "\r\n"
 	case "replconf":
-		out += "+" + "OK" + "\r\n"
+		if(string(result[1].Data) == "GETACK" && string(result[2].Data) == "*") {
+			oa := make([]string, 3)
+			oa[0] = createBulkString("REPLCONF");
+			oa[1] = createBulkString("ACK");
+			oa[2] = createBulkString("0");
+			out += createRESPArray(oa);
+		} else {
+			out += "+" + "OK" + "\r\n"
+		}
 	case "psync":	
 		if string(result[1].Data) == "?" && string(result[2].Data) == "-1" {
 			out = "+FULLRESYNC " + server.master_replid + " " + strconv.Itoa(server.master_repl_offset) + "\r\n"
@@ -382,8 +390,7 @@ func (server *RedisServer) eventLoopStart() {
 		fmt.Println("Adding master to the polling")
 		mfd, _ := GetTCPConnectionFd(server.masterConn)
 		server.masterFd = int(mfd);
-		server.pollFds[server.masterFd] = unix.PollFd{ Fd: int32(server.masterFd), Events: unix.POLLIN};	//!Only polling in, won't be writing to master
-
+		server.pollFds[server.masterFd] = unix.PollFd{ Fd: int32(server.masterFd), Events: unix.POLLIN | unix.POLLOUT,};	//!Only polling in, won't be writing to master
 		//!Just in case, there were messages, read and interpret them and store them.
 		buffer := make([]byte, 1024)
 		_, err := server.masterConn.Read(buffer)
@@ -477,17 +484,23 @@ func (server *RedisServer) eventLoopStart() {
 						//fmt.Println("Read data is: ", string(buffer))
 						parsedInput, _ := server.parseInput(buffer[:n]);						
 						cmdName := strings.ToLower(string(parsedInput[0].Data)) 
-						fmt.Println("Cmd name after parsing is: ", cmdName)
-						if cmdName == "set" {
-							server.forwardRequest(buffer[:n])
-						}
 						outbytes, _ := server.RequestHandler(parsedInput)
-						if  cmdName == "psync" {
-							//!Handshake is completing, add it to the list of replicas
-							server.replcas[fd] = clientConn;
-							fmt.Println("Setting the replicas")
-						}						
-						server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)
+						if server.masterConn == nil {	//!This is master
+							switch cmdName {
+								case "set":
+									server.forwardRequest(buffer[:n])
+								case "psync":
+									server.replcas[fd] = clientConn;
+									fmt.Println("Added a replica with fd: ", fd)
+							}
+							server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)
+						} else {	//!This is replica
+							if cmdName == "replconf" {
+								if len(parsedInput) == 3 && string(parsedInput[1].Data) == "GETACK" && string(parsedInput[2].Data) == "*" {
+									server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)									
+								}
+							}
+						}		
 					}
 				}
 
