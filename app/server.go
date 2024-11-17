@@ -172,6 +172,10 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 		out += "+" + "PONG" + "\r\n"
 	case "replconf":
 		out += "+" + "OK" + "\r\n"
+	case "psync":	
+		if string(result[1].Data) == "?" && string(result[2].Data) == "-1" {
+			out = "+FULLRESYNC " + server.master_replid + " " + strconv.Itoa(server.master_repl_offset) + "\r\n"
+		}
 	case "echo":
 		//!Get byte array of all the rest elements
 		var obytes []byte
