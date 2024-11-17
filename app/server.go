@@ -409,7 +409,7 @@ func (server *RedisServer) eventLoopStart() {
 			fmt.Println("Nothing on fd:", server.masterFd, "|error:", err.Error())
 		} else {
 			fmt.Println("Printing buffer")
-			fmt.Print("%q\n", buffer);
+			fmt.Printf("%q\n", buffer);
 
 			var cmdBeginIndices []int
 
@@ -535,6 +535,7 @@ func (server *RedisServer) eventLoopStart() {
 			}
 		}
 	}
+	fmt.Println("Closing the event loop")
 }
 
 // RDBFileManager handles Redis Database (RDB) file parsing.
