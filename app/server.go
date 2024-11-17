@@ -404,10 +404,11 @@ func (server *RedisServer) eventLoopStart() {
 	
 		//!Just in case, there were messages, read and interpret them and store them.
 		buffer := make([]byte, 1024)
-		_, err := server.masterConn.Read(buffer)
+		n, err := server.masterConn.Read(buffer)
 		if err != nil {
 			fmt.Println("Nothing on fd:", server.masterFd, "|error:", err.Error())
 		} else {
+			buffer = buffer[:n]
 			fmt.Println("Printing buffer")
 			fmt.Printf("%q\n", buffer);
 
