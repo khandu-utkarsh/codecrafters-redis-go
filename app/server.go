@@ -497,7 +497,8 @@ func (server *RedisServer) eventLoopStart() {
 						} else {	//!This is replica
 							if cmdName == "replconf" {
 								if len(parsedInput) == 3 && string(parsedInput[1].Data) == "GETACK" && string(parsedInput[2].Data) == "*" {
-									server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)									
+									server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)		
+									fmt.Println("RCh")							
 								}
 							}
 						}		
