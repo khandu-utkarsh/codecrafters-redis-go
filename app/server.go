@@ -28,27 +28,42 @@ type ValueTickPair struct {
 
 //!Create a reddis server
 type RedisServer struct {
-	listener    net.Listener
-	clients     map[int]net.Conn
-	replcas 	map[int]net.Conn
-	pollFds     map[int]unix.PollFd
-	requestResponseBuffer map[int][]byte
+
+	//!Redis server details
+	listener    *net.TCPListener
+	port int
+
+	//!Replication details:
+
+	//!If master
+	replcas 	map[int]*net.TCPConn	//!Fd to tcpConnection
 	forwardingReqBuffer map[int][]byte
+
+	//!If slaves
+	masterAddress string	
+	master_replid string
+	master_repl_offset int
+	masterConn *net.TCPConn
+	masterFd int
+
+
+	//!Clients
+	clients     map[int]*net.TCPConn
+
+	//!Polling details
+	pollFds     map[int]unix.PollFd	//!Fd to unix polling objs
+
+
+	//!Req, response
+	requestResponseBuffer map[int][]byte
+
+	//!Datastore
 	databse map[string]ValueTickPair
+
 
 	//!Configs for rdb persistence
 	rdbDirPath string
 	rdbFileName string
-
-
-	//!Replication details
-	masterAddress string
-	master_replid string
-	master_repl_offset int
-
-	//!Store the conn ids of replicas
-
-
 }
 
 //!Constructor
@@ -58,11 +73,12 @@ func NewRedisServer(address string) (*RedisServer, error) {
 		return nil, fmt.Errorf("error listening on port %s: %v", address, err)
 	}
 
+
 	return &RedisServer{
-		listener:     listener,
-		clients:      make(map[int]net.Conn),
+		listener:     listener.(*net.TCPListener),
+		clients:      make(map[int]*net.TCPConn),
 		pollFds:      make(map[int]unix.PollFd),
-		replcas: 	  make(map[int]net.Conn),
+		replcas: 	  make(map[int]*net.TCPConn),
 		requestResponseBuffer: make(map[int][]byte),
 		forwardingReqBuffer: make(map[int][]byte),
 		databse:  make(map[string]ValueTickPair),
@@ -127,7 +143,8 @@ func createRESPArray(inparray []string) (string) {
 }
 
 func (server *RedisServer) forwardRequest(reqData []byte) {
-	for fd, _ := range server.replcas {
+	for fd := range server.replcas {
+		fmt.Println("Adding data to buffer")
 		server.forwardingReqBuffer[fd] = append(server.forwardingReqBuffer[fd], reqData...)
 	}
 }
@@ -224,6 +241,7 @@ func (server *RedisServer) RequestHandler(result []ByteIntPair) ([]byte, error) 
 		}
 		out += createBulkString(string(obytes));
 	case "set":
+		fmt.Println("Reaching here in set")
 		if(len(result) < 3) {
 			fmt.Println("Minimum args req are 3")
 		} else {
@@ -247,6 +265,7 @@ func (server *RedisServer) RequestHandler(result []ByteIntPair) ([]byte, error) 
 			}
 			server.databse[key] = vt;
 			out += "+" + "OK" + "\r\n"			
+			fmt.Println("Here in set: ", server.databse)
 		}
 	case "get":
 		if(len(result) < 2) {
@@ -266,6 +285,7 @@ func (server *RedisServer) RequestHandler(result []ByteIntPair) ([]byte, error) 
 				out += "$-1\r\n"
 			}
 		}
+		fmt.Println("Out string after get: ", out)
 	case "config":
 		if(len(result) < 3) {
 			fmt.Println("Minimum args req are 3 for config")
@@ -354,10 +374,43 @@ func (server *RedisServer) eventLoopStart() {
 	rdbManager.LoadDatabase(server);
 
 	// Add listener FD to pollFds for read events
-	listenerFd, _ := GetTCPListenerFd(server.listener.(*net.TCPListener))
+	listenerFd, _ := GetTCPListenerFd(server.listener)
 	lfd := int(listenerFd)
 
 	server.pollFds[lfd] = unix.PollFd{Fd: int32(lfd), Events: unix.POLLIN};
+
+	if server.masterConn != nil {
+		fmt.Println("Adding master to the polling")
+		mfd, _ := GetTCPConnectionFd(server.masterConn)
+		server.masterFd = int(mfd);
+		server.pollFds[server.masterFd] = unix.PollFd{ Fd: int32(server.masterFd), Events: unix.POLLIN};	//!Only polling in, won't be writing to master
+
+		//!Just in case, there were messages, read and interpret them and store them.
+		buffer := make([]byte, 1024)
+		_, err := server.masterConn.Read(buffer)
+		if err != nil {
+			fmt.Println("Nothing on fd:", server.masterFd, "|error:", err.Error())
+		} else {
+
+			var cmdBeginIndices []int
+
+			for pos, curr := range buffer {
+				if curr == '*' {
+					cmdBeginIndices = append(cmdBeginIndices, pos)
+				}
+			}
+			cmdBeginIndices = append(cmdBeginIndices, len(buffer))
+
+			for i := 0; i + 1 < len(cmdBeginIndices); i++ {
+				s := cmdBeginIndices[i]
+				onePastE := cmdBeginIndices[i + 1]
+				cmdB := buffer[s: onePastE]
+				fmt.Println("Processing curr cmd: n", string(cmdB))
+				parsedInput, _ := server.parseInput(cmdB);
+				server.RequestHandler(parsedInput)
+			}
+		}
+	}
 
 	fmt.Print("Before executing main loop, map of pollFds: ")
 	fmt.Println(server.pollFds)
@@ -365,23 +418,25 @@ func (server *RedisServer) eventLoopStart() {
 	// Main event loop
 	for {	
 
+		//!Polling on all the fds in the map
+
 		//!Creating a poll fd slice
 		var pollFdsSlice []unix.PollFd;
 		for _, pfd := range server.pollFds {
 			pollFdsSlice = append(pollFdsSlice, pfd);
 		}
-
 		// Poll for events
 		n, err := unix.Poll(pollFdsSlice, -1) // Wait indefinitely for I/O events
 		if err != nil {
 			fmt.Println("Error polling:", err)
 			break
 		}
-	
+
 		// Handle each event
 		for i := 0; i < n; i++ {
 			fd := int(pollFdsSlice[i].Fd)
 			if fd == lfd && pollFdsSlice[i].Revents & unix.POLLIN != 0 {
+				//!TCP Server fd --> Must be new connection req
 
 				// New connection request
 				conn, err := server.listener.Accept()
@@ -395,14 +450,19 @@ func (server *RedisServer) eventLoopStart() {
 				tcpConnFd, _ := GetTCPConnectionFd(tcpConn)
 				connFd := int(tcpConnFd)
 
-				server.clients[connFd] = conn
+				server.clients[connFd] = tcpConn
 				server.pollFds[connFd] = unix.PollFd{ Fd: int32(connFd), Events: unix.POLLIN | unix.POLLOUT,};
 				fmt.Println("Accepted new connection:", conn.RemoteAddr())
 			} else {
 
 				clientConn, ok := server.clients[fd]
 				if !ok {
-					continue
+					if fd != server.masterFd {
+						continue;						
+					} else {
+						clientConn = server.masterConn
+						//fmt.Println("Request from master")
+					}
 				}
 	
 				// Check for read events (data from user)
@@ -418,7 +478,9 @@ func (server *RedisServer) eventLoopStart() {
 						//fmt.Println("Read data is: ", string(buffer))
 						parsedInput, _ := server.parseInput(buffer[:n]);						
 						cmdName := strings.ToLower(string(parsedInput[0].Data)) 
+						fmt.Println("Cmd name after parsing is: ", cmdName)
 						if(cmdName == "set") {
+							fmt.Println("Should hit man")
 							server.forwardRequest(buffer[:n]);
 						}
 						outbytes, _ := server.RequestHandler(parsedInput)
@@ -428,9 +490,6 @@ func (server *RedisServer) eventLoopStart() {
 							fmt.Println("Setting the replicas")
 						}						
 						server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)
-
-
-
 					}
 				}
 
@@ -441,6 +500,7 @@ func (server *RedisServer) eventLoopStart() {
 						delete(server.requestResponseBuffer, fd)
 					}
 					if data, ok := server.forwardingReqBuffer[fd]; ok && len(data) > 0 {
+						fmt.Println("Req frowards to ", clientConn)
 						clientConn.Write(server.forwardingReqBuffer[fd])
 						delete(server.forwardingReqBuffer, fd)
 					}
@@ -553,10 +613,10 @@ func (rdb *RDBFileManager) parseEntry(buffer []byte, server *RedisServer) int64 
 
 func (rdb *RDBFileManager) LoadDatabase(server *RedisServer) {
 	filePath := filepath.Join(server.rdbDirPath, server.rdbFileName)
-	fmt.Println("loading file:", filePath)
+	//fmt.Println("loading file:", filePath)
 	rdbFile, err := os.Open(filePath)
 	if err != nil {
-		fmt.Println("Unable to open file at:", filePath)
+		//fmt.Println("Unable to open file at:", filePath)
 		return
 	}
 	defer rdbFile.Close()
@@ -637,6 +697,81 @@ func (rdb *RDBFileManager) LoadDatabase(server *RedisServer) {
 	}
 }
 
+func (server * RedisServer) doReplicationHandshake() (*net.TCPConn) {
+	masterAddress := server.masterAddress
+	//!Dial to create connection
+	conn, err := net.Dial("tcp", masterAddress)
+	if err != nil {
+		fmt.Printf("Error connecting to master server: %v\n", err)
+		return nil
+	}
+
+	fmt.Printf("Connected to server at %s\n", masterAddress)
+
+	//!Performing handshake protocol:
+
+	messages := make([]string, 4)
+	messages[0] = "PING"
+	messages[1] = "REPLCONF"
+	messages[2] = "REPLCONF"
+	messages[3] = "PSYNC"
+
+	for idx, message := range messages {
+		var out string
+		if idx == 1 {
+			oa := make([]string, 3)
+			oa[0] = message
+			oa[1] = "listening-port"
+			oa[2] = strconv.Itoa(server.port)
+
+			oa[0] = createBulkString(oa[0]);
+			oa[1] = createBulkString(oa[1]);
+			oa[2] = createBulkString(oa[2]);
+			out = createRESPArray(oa);
+		} else if(idx == 2) {
+			oa := make([]string, 3)
+			oa[0] = message
+			oa[1] = "capa"
+			oa[2] = "psync2"
+
+			oa[0] = createBulkString(oa[0]);
+			oa[1] = createBulkString(oa[1]);
+			oa[2] = createBulkString(oa[2]);
+			out = createRESPArray(oa);				
+		} else if(idx == 3) {
+			//"Since it is the first time connecting and we don't know any info about the master, hence sending this:"
+			oa := make([]string, 3)
+			oa[0] = message
+			oa[1] = "?"
+			oa[2] = "-1"
+
+			oa[0] = createBulkString(oa[0]);
+			oa[1] = createBulkString(oa[1]);
+			oa[2] = createBulkString(oa[2]);
+			out = createRESPArray(oa);				
+		} else {
+			oa := make([]string, 1)
+			oa[0] = message
+			oa[0] = createBulkString(oa[0]);
+			out = createRESPArray(oa);
+		}
+		_, err = conn.Write([]byte(out))
+		if err != nil {
+			fmt.Printf("Error sending message: %v\n", err)
+			return nil
+		}
+		buffer := make([]byte, 1024)
+		_, err := conn.Read(buffer)
+		if err != nil {
+			fmt.Println("Closing replication error. ", err)
+		} else {
+			fmt.Println("Handshake request: ", message, " |Handshake response: ", string(buffer));
+		}
+	}
+	return conn.(*net.TCPConn)
+}
+
+
 func main() {
 
 	cmdArgs := os.Args[1:];
@@ -661,7 +796,6 @@ func main() {
 		}
 	}
 
-
 	portString := ":" + strconv.Itoa(port);
 
 	fmt.Println("Printing all the cmd line arguments")
@@ -673,89 +807,20 @@ func main() {
         fmt.Println("Error listening on port ", port, ": ", err)
         os.Exit(1)
     }
-	//!Setting the rdb params:
+	server.port = port
 	server.rdbDirPath = dirName;
 	server.rdbFileName = rdbFileName;
 
-	server.masterAddress = masterAddress;
 	if(masterAddress != "") {
-		compAdd := 	strings.Split(server.masterAddress, " ")
+		compAdd := 	strings.Split(masterAddress, " ")
 		ipAdd := compAdd[0]
 		ipPort := compAdd[1]
 		masterAdd := ipAdd + ":"+ ipPort
-		//!This is a replica of some master, initiate a connection to the master
-		conn, err := net.Dial("tcp", masterAdd)
-		if err != nil {
-			fmt.Printf("Error connecting to master server: %v\n", err)
-		}
-		defer conn.Close()
-		fmt.Printf("Connected to server at %s\n", masterAdd)
-
-		//!Sending the message to the master server
-
-		//!Send messages to complete the handshake protocol
-
-		messages := make([]string, 4)
-		messages[0] = "PING"
-		messages[1] = "REPLCONF"
-		messages[2] = "REPLCONF"
-		messages[3] = "PSYNC"
-
-		for idx, message := range messages {
-			var out string
-			if idx == 1 {
-				oa := make([]string, 3)
-				oa[0] = message
-				oa[1] = "listening-port"
-				oa[2] = strconv.Itoa(port)
-
-				oa[0] = createBulkString(oa[0]);
-				oa[1] = createBulkString(oa[1]);
-				oa[2] = createBulkString(oa[2]);
-				out = createRESPArray(oa);
-			} else if(idx == 2) {
-				oa := make([]string, 3)
-				oa[0] = message
-				oa[1] = "capa"
-				oa[2] = "psync2"
-
-				oa[0] = createBulkString(oa[0]);
-				oa[1] = createBulkString(oa[1]);
-				oa[2] = createBulkString(oa[2]);
-				out = createRESPArray(oa);				
-			} else if(idx == 3) {
-				//"Since it is the first time connecting and we don't know any info about the master, hence sending this:"
-				oa := make([]string, 3)
-				oa[0] = message
-				oa[1] = "?"
-				oa[2] = "-1"
-
-				oa[0] = createBulkString(oa[0]);
-				oa[1] = createBulkString(oa[1]);
-				oa[2] = createBulkString(oa[2]);
-				out = createRESPArray(oa);				
-			} else {
-				oa := make([]string, 1)
-				oa[0] = message
-				oa[0] = createBulkString(oa[0]);
-				out = createRESPArray(oa);
-			}
-			_, err = conn.Write([]byte(out))
-			if err != nil {
-				fmt.Printf("Error sending message: %v\n", err)
-				return
-			}
-			fmt.Println("Message sent:", out)
-			buffer := make([]byte, 1024)
-			_, err := conn.Read(buffer)
-			if err != nil {
-				fmt.Println("Closing replication error. ", err)
-			} else {
-				fmt.Println("Received on replication message: ", message, " |Read data: ", string(buffer));
-			}
-
-
-		}
+		server.masterAddress = masterAdd;
+		masterTCPConn := server.doReplicationHandshake()
+		server.masterConn = masterTCPConn
+	} else {
+		server.masterConn = nil
 	}
 	defer server.listener.Close()
 	server.eventLoopStart();
