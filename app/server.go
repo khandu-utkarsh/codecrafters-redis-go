@@ -186,6 +186,7 @@ func (server *RedisServer) parseInput(inputRawData []byte) ([]ByteIntPair, error
 			_, _ = strconv.Atoi(strElem)
 			input = input[endIndex+2:]
 			endIndex = bytes.Index(input, crlfSubstr)
+			fmt.Println("End index2 : ", endIndex, " | len: ", len(input))
 			result = append(result, ByteIntPair{Data: input[:endIndex], Value: 1})
 		default:
 			return nil, fmt.Errorf("unhandled case: %c", input[0])
