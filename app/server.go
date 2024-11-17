@@ -30,8 +30,10 @@ type ValueTickPair struct {
 type RedisServer struct {
 	listener    net.Listener
 	clients     map[int]net.Conn
+	replcas 	map[int]net.Conn
 	pollFds     map[int]unix.PollFd
 	requestResponseBuffer map[int][]byte
+	forwardingReqBuffer map[int][]byte
 	databse map[string]ValueTickPair
 
 	//!Configs for rdb persistence
@@ -43,6 +45,10 @@ type RedisServer struct {
 	masterAddress string
 	master_replid string
 	master_repl_offset int
+
+	//!Store the conn ids of replicas
+
+
 }
 
 //!Constructor
@@ -56,6 +62,7 @@ func NewRedisServer(address string) (*RedisServer, error) {
 		listener:     listener,
 		clients:      make(map[int]net.Conn),
 		pollFds:      make(map[int]unix.PollFd),
+		replcas: 	  make(map[int]net.Conn),
 		requestResponseBuffer: make(map[int][]byte),
 		databse:  make(map[string]ValueTickPair),
 		master_replid: "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
@@ -118,6 +125,12 @@ func createRESPArray(inparray []string) (string) {
 
 }
 
+func (server *RedisServer) forwardRequest(reqData []byte) {
+	for fd, _ := range server.replcas {
+		server.forwardingReqBuffer[fd] = append(server.forwardingReqBuffer[fd], reqData...)
+	}
+}
+
 // parseInput validates and parses the input into a structured format
 func (server *RedisServer) parseInput(inputRawData []byte) ([]ByteIntPair, error) {
 	var result []ByteIntPair
@@ -168,12 +181,10 @@ func (server *RedisServer) parseInput(inputRawData []byte) ([]ByteIntPair, error
 
 
 // RequestHandler processes the input and returns the response
-func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
-	var result []ByteIntPair
+func (server *RedisServer) RequestHandler(result []ByteIntPair) ([]byte, error) {
+
 	var out string
 	var outFile []byte;
-
-	result, _ = server.parseInput(inputRawData);
 
 	if(result[0].Value == 2) {
 		fmt.Println("First element in the array encountered to be integer, look into it.")
@@ -284,7 +295,7 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 				
 				if(string(qkey.Data) == "*") {
 					var keysout []string
-					for k, _ := range server.databse {
+					for k := range server.databse {
 						kstr := createBulkString(k);
 						keysout = append(keysout, kstr)
 					}
@@ -404,8 +415,20 @@ func (server *RedisServer) eventLoopStart() {
 						delete(server.pollFds, fd) // Remove from pollFds
 					} else {
 						//fmt.Println("Read data is: ", string(buffer))
-						outbytes, _ := server.RequestHandler(buffer[:n])
+						parsedInput, _ := server.parseInput(buffer[:n]);						
+						cmdName := strings.ToLower(string(parsedInput[0].Data)) 
+						if(cmdName == "set") {
+							server.forwardRequest(buffer[:n]);
+						}
+						outbytes, _ := server.RequestHandler(parsedInput)
+						if  cmdName == "psync" {
+							//!Handshake is completing, add it to the list of replicas
+							server.replcas[fd] = clientConn;
+						}						
 						server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)
+
+
+
 					}
 				}
 
@@ -414,6 +437,10 @@ func (server *RedisServer) eventLoopStart() {
 					if data, ok := server.requestResponseBuffer[fd]; ok && len(data) > 0 {
 						clientConn.Write(server.requestResponseBuffer[fd])
 						delete(server.requestResponseBuffer, fd)
+					}
+					if data, ok := server.forwardingReqBuffer[fd]; ok && len(data) > 0 {
+						clientConn.Write(server.forwardingReqBuffer[fd])
+						delete(server.forwardingReqBuffer, fd)
 					}
 				}
 			}
@@ -425,9 +452,6 @@ func (server *RedisServer) eventLoopStart() {
 type RDBFileManager struct {
 	directoryPath         string
 	dbName                string
-	databaseSelector      int64
-	hashTableSize         int64
-	expiringHashTableSize int64
 }
 
 // parseEncodedData parses length-prefixed data, supporting multiple formats.
