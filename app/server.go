@@ -169,7 +169,7 @@ func (server *RedisServer) parseInput(inputRawData []byte) ([]ByteIntPair, error
 	}
 	input = input[endIndex+2:]
 	fmt.Println("Elem count is: ", elemsCount)
-	fmt.Println(input)
+	fmt.Println(string(input))
 	fmt.Println("End")
 	// Parse each element in the array
 	for i := 0; i < elemsCount; i++ {
