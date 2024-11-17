@@ -39,7 +39,8 @@ type RedisServer struct {
 
 	//!Replication details
 	masterAddress string
-
+	master_replid string
+	master_repl_offset int
 }
 
 //!Constructor
@@ -55,6 +56,8 @@ func NewRedisServer(address string) (*RedisServer, error) {
 		pollFds:      make(map[int]unix.PollFd),
 		requestResponseBuffer: make(map[int][]byte),
 		databse:  make(map[string]ValueTickPair),
+		master_replid: "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
+		master_repl_offset: 0,
 	}, nil
 }
 
@@ -270,7 +273,11 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 				} else {
 					rolev = "slave"
 				}
-				retstr := "role:" + rolev;
+				retstr := "role:" + rolev
+				retstr +="\n"
+				retstr += "master_replid:" + server.master_replid
+				retstr +="\n"
+				retstr += "master_repl_offset:" + strconv.Itoa(server.master_repl_offset);
 				out += createBulkString(retstr);				
 			}	
 		}
