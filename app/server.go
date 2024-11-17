@@ -797,6 +797,16 @@ func (server * RedisServer) doReplicationHandshake() (*net.TCPConn) {
 			fmt.Println("Handshake request: ", message, " |Handshake response: ", string(buffer));
 		}
 	}
+	//!To make sure, process the last call it should be the file
+	buffer := make([]byte, 1024)
+	n, err := conn.Read(buffer)
+	if err != nil {
+		fmt.Println("Closing replication error. ", err)
+	} else {
+		buffer = buffer[:n]		
+		fmt.Println("File from master");
+		fmt.Printf("%q\n", buffer);
+	}
 	return conn.(*net.TCPConn)
 }
 
