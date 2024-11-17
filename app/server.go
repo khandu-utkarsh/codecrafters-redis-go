@@ -408,6 +408,8 @@ func (server *RedisServer) eventLoopStart() {
 		if err != nil {
 			fmt.Println("Nothing on fd:", server.masterFd, "|error:", err.Error())
 		} else {
+			fmt.Println("Printing buffer")
+			fmt.Print("%q\n", buffer);
 
 			var cmdBeginIndices []int
 
