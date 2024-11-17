@@ -64,6 +64,7 @@ func NewRedisServer(address string) (*RedisServer, error) {
 		pollFds:      make(map[int]unix.PollFd),
 		replcas: 	  make(map[int]net.Conn),
 		requestResponseBuffer: make(map[int][]byte),
+		forwardingReqBuffer: make(map[int][]byte),
 		databse:  make(map[string]ValueTickPair),
 		master_replid: "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
 		master_repl_offset: 0,
@@ -424,6 +425,7 @@ func (server *RedisServer) eventLoopStart() {
 						if  cmdName == "psync" {
 							//!Handshake is completing, add it to the list of replicas
 							server.replcas[fd] = clientConn;
+							fmt.Println("Setting the replicas")
 						}						
 						server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)
 
