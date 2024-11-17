@@ -35,6 +35,11 @@ type RedisServer struct {
 	//!Configs for rdb persistence
 	rdbDirPath string
 	rdbFileName string
+
+
+	//!Replication details
+	masterAddress string
+
 }
 
 //!Constructor
@@ -254,7 +259,26 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 				}				
 			}
 		}
-
+	case "info":
+		if(len(result) < 2) {
+			fmt.Println("Nothing requested with replication. Ideally should return all the information about the server, but currently returning none.")
+		} else {
+			if(strings.ToLower(string(result[1].Data)) == "replication") {
+				var rolev string
+				if server.masterAddress == "" {
+					rolev = "master"
+				} else {
+					rolev = "slave"
+				}
+				retstr := "role:" + rolev;
+				out += createBulkString(retstr);				
+			}	
+		}
+		fmt.Println("All the commands are printed: ", result);
+		for _, e := range result {
+			fmt.Println(string(e.Data))
+		}
+		// if(len(result) <)
 
 		
 	default:
@@ -553,7 +577,8 @@ func main() {
 	var dirName string;
 	var rdbFileName string;
 	var port int;
-	port = 6379;	
+	port = 6379;
+	var masterAddress string
 	for index, arg := range cmdArgs {
 		switch arg {
 		case "--dir":
@@ -562,10 +587,13 @@ func main() {
 			rdbFileName = cmdArgs[index + 1];
 		case "--port":
 			port, _ = strconv.Atoi(cmdArgs[index + 1]);
+		case "--replicaof":
+			masterAddress = cmdArgs[index + 1];		
 		default:
 			continue;
 		}
 	}
+
 
 	portString := ":" + strconv.Itoa(port);
 
@@ -581,6 +609,11 @@ func main() {
 	//!Setting the rdb params:
 	server.rdbDirPath = dirName;
 	server.rdbFileName = rdbFileName;
-    defer server.listener.Close()
+
+	server.masterAddress = masterAddress;
+
+
+
+	defer server.listener.Close()
 	server.eventLoopStart();
 }
