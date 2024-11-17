@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -120,6 +122,7 @@ func createRESPArray(inparray []string) (string) {
 func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 	var result []ByteIntPair
 	var out string
+	var outFile []byte;
 
 	// Create a copy of the input
 	input := make([]byte, len(inputRawData))
@@ -175,6 +178,17 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 	case "psync":	
 		if string(result[1].Data) == "?" && string(result[2].Data) == "-1" {
 			out = "+FULLRESYNC " + server.master_replid + " " + strconv.Itoa(server.master_repl_offset) + "\r\n"
+
+			// Hex string of the content of RBD File -- Got it from the github
+			hexString := "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2"
+			// Convert hex string to []byte
+			rdbContentBytes, err := hex.DecodeString(hexString)
+			if err != nil {
+				log.Fatalf("Error decoding rdb file content hex string: %v", rdbContentBytes)
+			}
+			prefixString := "$" + strconv.Itoa(len(rdbContentBytes)) + "\r\n"
+			outFile = append(outFile, []byte(prefixString)...)
+			outFile = append(outFile, rdbContentBytes...)
 		}
 	case "echo":
 		//!Get byte array of all the rest elements
@@ -296,8 +310,12 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 	default:
 		fmt.Println("Not yet implemented for, ", cmdName);
 	}
-	return []byte(out), nil;
-		
+
+	retBytes := []byte(out);
+	if len(outFile) != 0 {
+		retBytes = append(retBytes, outFile...)
+	}
+	return retBytes, nil;	
 }
 
 
