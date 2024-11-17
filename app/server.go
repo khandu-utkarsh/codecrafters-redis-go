@@ -399,6 +399,9 @@ func (server *RedisServer) eventLoopStart() {
 		mfd, _ := GetTCPConnectionFd(server.masterConn)
 		server.masterFd = int(mfd);
 		server.pollFds[server.masterFd] = unix.PollFd{ Fd: int32(server.masterFd), Events: unix.POLLIN | unix.POLLOUT,};	//!Only polling in, won't be writing to master
+		fmt.Print("Just after adding map of pollFds: ")
+		fmt.Println(server.pollFds)
+	
 		//!Just in case, there were messages, read and interpret them and store them.
 		buffer := make([]byte, 1024)
 		_, err := server.masterConn.Read(buffer)
