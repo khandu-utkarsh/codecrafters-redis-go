@@ -674,6 +674,15 @@ func main() {
 				return
 			}
 			fmt.Println("Message sent:", out)
+			buffer := make([]byte, 1024)
+			_, err := conn.Read(buffer)
+			if err != nil {
+				fmt.Println("Closing replication error, some error.")
+			} else {
+				fmt.Println("Received on replication message: ", message, " |Read data: ", string(buffer));
+			}
+
+
 		}
 	}
 	defer server.listener.Close()
