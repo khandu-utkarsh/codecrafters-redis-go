@@ -439,7 +439,7 @@ func (server *RedisServer) eventLoopStart() {
 
 	// Main event loop
 	for {	
-
+		fmt.Println("Iteration")
 		//!Polling on all the fds in the map
 
 		//!Creating a poll fd slice
