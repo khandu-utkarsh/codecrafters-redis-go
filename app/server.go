@@ -632,17 +632,25 @@ func main() {
 		fmt.Printf("Connected to server at %s\n", masterAdd)
 
 		//!Sending the message to the master server
-		message := "PING"
-		oa := make([]string, 1)
-		oa[0] = createBulkString(message);
-		out := createRESPArray(oa);
 
-		_, err = conn.Write([]byte(out))
-		if err != nil {
-			fmt.Printf("Error sending message: %v\n", err)
-			return
+		//!Send messages to complete the handshake protocol
+
+		messages := make([]string, 3)
+		messages[0] = "PING"
+		messages[1] = "REPLCONF listening-port " + strconv.Itoa(port)
+		messages[2] = "REPLCONF capa psync2"
+
+		for _, message := range messages {
+			oa := make([]string, 1)
+			oa[0] = createBulkString(message);
+			out := createRESPArray(oa);
+			_, err = conn.Write([]byte(out))
+			if err != nil {
+				fmt.Printf("Error sending message: %v\n", err)
+				return
+			}
+			fmt.Println("Message sent:", out)
 		}
-		fmt.Println("Message sent:", out)
 	}
 	defer server.listener.Close()
 	server.eventLoopStart();
