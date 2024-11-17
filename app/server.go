@@ -483,7 +483,7 @@ func (server *RedisServer) eventLoopStart() {
 				if pollFdsSlice[i].Revents & unix.POLLIN != 0 {
 					buffer := make([]byte, 1024)
 					n, err := clientConn.Read(buffer)
-					if err != nil {
+					if err != nil && fd != server.masterFd{
 						fmt.Println("Closing fd:", fd, "|error:", err.Error())
 						clientConn.Close()
 						delete(server.clients, fd)
