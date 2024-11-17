@@ -241,7 +241,6 @@ func (server *RedisServer) RequestHandler(result []ByteIntPair) ([]byte, error) 
 		}
 		out += createBulkString(string(obytes));
 	case "set":
-		fmt.Println("Reaching here in set")
 		if(len(result) < 3) {
 			fmt.Println("Minimum args req are 3")
 		} else {
@@ -479,9 +478,8 @@ func (server *RedisServer) eventLoopStart() {
 						parsedInput, _ := server.parseInput(buffer[:n]);						
 						cmdName := strings.ToLower(string(parsedInput[0].Data)) 
 						fmt.Println("Cmd name after parsing is: ", cmdName)
-						if(cmdName == "set") {
-							fmt.Println("Should hit man")
-							server.forwardRequest(buffer[:n]);
+						if cmdName == "set" {
+							server.forwardRequest(buffer[:n])
 						}
 						outbytes, _ := server.RequestHandler(parsedInput)
 						if  cmdName == "psync" {
