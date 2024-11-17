@@ -689,7 +689,7 @@ func main() {
 			buffer := make([]byte, 1024)
 			_, err := conn.Read(buffer)
 			if err != nil {
-				fmt.Println("Closing replication error, some error.")
+				fmt.Println("Closing replication error. ", err)
 			} else {
 				fmt.Println("Received on replication message: ", message, " |Read data: ", string(buffer));
 			}
