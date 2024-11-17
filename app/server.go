@@ -390,6 +390,10 @@ func (server *RedisServer) eventLoopStart() {
 
 	server.pollFds[lfd] = unix.PollFd{Fd: int32(lfd), Events: unix.POLLIN};
 
+
+	fmt.Print("Before adding master server, map of pollFds: ")
+	fmt.Println(server.pollFds)
+
 	if server.masterConn != nil {
 		fmt.Println("Adding master to the polling")
 		mfd, _ := GetTCPConnectionFd(server.masterConn)
