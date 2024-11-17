@@ -635,10 +635,11 @@ func main() {
 
 		//!Send messages to complete the handshake protocol
 
-		messages := make([]string, 3)
+		messages := make([]string, 4)
 		messages[0] = "PING"
 		messages[1] = "REPLCONF"
 		messages[2] = "REPLCONF"
+		messages[3] = "PSYNC"
 
 		for idx, message := range messages {
 			var out string
@@ -657,6 +658,17 @@ func main() {
 				oa[0] = message
 				oa[1] = "capa"
 				oa[2] = "psync2"
+
+				oa[0] = createBulkString(oa[0]);
+				oa[1] = createBulkString(oa[1]);
+				oa[2] = createBulkString(oa[2]);
+				out = createRESPArray(oa);				
+			} else if(idx == 3) {
+				//"Since it is the first time connecting and we don't know any info about the master, hence sending this:"
+				oa := make([]string, 3)
+				oa[0] = message
+				oa[1] = "?"
+				oa[2] = "-1"
 
 				oa[0] = createBulkString(oa[0]);
 				oa[1] = createBulkString(oa[1]);
