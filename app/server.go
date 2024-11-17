@@ -170,7 +170,8 @@ func (server *RedisServer) RequestHandler(inputRawData []byte) ([]byte, error) {
 	switch cmdName {
 	case "ping":
 		out += "+" + "PONG" + "\r\n"
-
+	case "replconf":
+		out += "+" + "OK" + "\r\n"
 	case "echo":
 		//!Get byte array of all the rest elements
 		var obytes []byte
