@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -141,7 +142,6 @@ func (server *RedisServer) RequestHandler(reqData [][]byte) ([]byte, error) {
 		
 	//	------------------------------------------------------------------------------------------  //		
 	default:
-		fmt.Println("Request response according to server type")
 		response, err = server.state.HandleRequest(reqData, server)
 	}
 	return response, err
@@ -150,15 +150,18 @@ func (server *RedisServer) RequestHandler(reqData [][]byte) ([]byte, error) {
 
 //!Sort of constructor
 // RedisServer struct maintains the current behavior and can switch between master and replica
-func NewRedisServer(address string, masterAddress string, rdbDicPath string, rdbFilePath string) (*RedisServer, error) {
+func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePath string) (*RedisServer, error) {
+	address := ":" + strconv.Itoa(port);
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return nil, fmt.Errorf("error listening on port %s: %v", address, err)
 	}
 
 	server := &RedisServer{
+		port: port,
 		listener:     listener.(*net.TCPListener),
 		clients:      make(map[int]*net.TCPConn),
+		pollFds:      make(map[int]unix.PollFd),
 		database:     make(map[string]ValueTickPair),
 		rdbDirPath:   rdbDicPath,
 		rdbFileName:  rdbFilePath,
@@ -209,7 +212,7 @@ func (server *RedisServer) SwitchToReplica() {
 }
 
 func (server *RedisServer) eventLoopStart() {
-
+	fmt.Println("Inside event loop")
 	//!Getting done on creation
 	// // Add listener FD to pollFds for read events
 	// listenerFd, _ := GetTCPListenerFd(server.listener)
@@ -261,7 +264,8 @@ func (server *RedisServer) eventLoopStart() {
 
 				clientConn, ok := server.clients[fd]
 				if !ok {
-					fmt.Println("Who added this in polling list")			
+					continue;
+					//fmt.Println("Who added this in polling list")			
 				}
 	
 				// Check for read events (data from user)
@@ -269,6 +273,7 @@ func (server *RedisServer) eventLoopStart() {
 					buffer := make([]byte, 1024)
 					n, err := clientConn.Read(buffer)
 					if(err != nil) {	//!Assuming work has been done, we can close it
+						fmt.Println("Checking for data: ",string(buffer[:n]))
 						fmt.Println("Closing fd:", fd, "|error:", err.Error())
 						clientConn.Close()
 						delete(server.clients, fd)

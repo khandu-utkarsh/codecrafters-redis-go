@@ -38,11 +38,8 @@ func main() {
 		}
 	}
 
-	portString := ":" + strconv.Itoa(port);
-
 	fmt.Println("Printing all the cmd line arguments: ", cmdArgs)
-
-	server, _ := NewRedisServer(portString, masterAddress, dirName, rdbFileName)
+	server, _ := NewRedisServer(port, masterAddress, dirName, rdbFileName)
 
 	defer server.listener.Close()
 	server.eventLoopStart();

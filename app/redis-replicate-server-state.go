@@ -132,12 +132,12 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 			oa := make([]string, 3)
 			oa[0] = message
 			oa[1] = "listening-port"
-			oa[2] = strconv.Itoa(server.port)
-
+			oa[2] = strconv.Itoa(server.port)			
 			oa[0] = createBulkString(oa[0]);
 			oa[1] = createBulkString(oa[1]);
 			oa[2] = createBulkString(oa[2]);
 			out = createRESPArray(oa);
+			fmt.Println("Index 1: ", out)
 		} else if(idx == 2) {
 			oa := make([]string, 3)
 			oa[0] = message
@@ -175,28 +175,26 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 		//!Highly possible that as soon as we connect, server sends us all the pending messages, so process them and store them as well.
 
 		buffer := make([]byte, 1024)
-
-
-		
-
-
-		_, err := conn.Read(buffer)
+		n, err := conn.Read(buffer)
 		if err != nil {
-			fmt.Println("Closing replication error. ", err)
+			fmt.Println("Close it replication error. ", err)
+			conn.Close()
+			r.masterConn = nil
+			delete(server.clients, r.masterFd)
+			delete(server.pollFds, r.masterFd)
 		} else {
-			fmt.Println("Handshake request: ", message, " |Handshake response: ", string(buffer));
+			fmt.Println("Handshake request: ", message, " |Handshake response: ", string(buffer), " Response len: ",len(buffer[:n]));
+			inputCommands := server.getCmdsFromInput(buffer[:n])			
+			//!Process each command individually
+			for _, inpCmd := range inputCommands{
+				//fmt.Println("Cmds are: ", inputCommands)
+				outbytes, _ := server.RequestHandler(inpCmd)
+				if len(outbytes) != 0 {
+					server.requestResponseBuffer[r.masterFd] = append(server.requestResponseBuffer[r.masterFd], outbytes...)
+				}
+			}
 		}
 	}
-	
-	//!To make sure, process the last call it should be the file
-	buffer := make([]byte, 1024)
-	n, err := conn.Read(buffer)
-	if err != nil {
-		fmt.Println("Closing replication error. ", err)
-	} else {
-		buffer = buffer[:n]		
-		fmt.Println("File from master");
-		fmt.Printf("%q\n", buffer);
-	}
-	return conn.(*net.TCPConn)
+
+	return r.masterConn
 }
