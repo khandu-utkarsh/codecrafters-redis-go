@@ -26,6 +26,7 @@ type RedisServer struct {
 	master_repl_offset int
 	
 	state       ServerState
+	is_replica bool
 
 	pollFds     map[int]unix.PollFd	//!Fd to unix polling objs
 	clients     map[int]*net.TCPConn
@@ -56,11 +57,11 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, clientConn *net.TCPC
 	case "ping":
 		out := "+" + "PONG" + "\r\n"
 		response = []byte(out)
-		rs, isReplica := server.state.(*ReplicaState)
-		if(isReplica && rs.masterConn == clientConn) {
+		if server.is_replica {
 			fmt.Println("Got this from: ", rs.masterFd, " ", rs.masterConn == clientConn)
 			response = make([]byte, 0)
 		}
+
 	//	------------------------------------------------------------------------------------------  //
 	case "echo":
 		//!Get byte array of all the rest elements
@@ -191,6 +192,7 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		server.state =&MasterState{
 			replcas: make(map[int]*net.TCPConn),
 		}
+		server.is_replica = false
 	} else {
 
 		//!Establish the connection to master here, doing the three step handshake, and if we get any data on socket, process it
@@ -198,7 +200,7 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		server.state = &ReplicaState{
 			masterAddress: masterAddress,
 		}
-
+		server.is_replica = true
 		repState, _ := server.state.(*ReplicaState)
 		//!Do the handshake to connect the replica to master
 		repState.doReplicationHandshake(server)
@@ -299,7 +301,9 @@ func (server *RedisServer) eventLoopStart() {
 							}
 							outbytes, _ := server.RequestHandler(inpCmd, clientConn)
 							fmt.Println("Curr cmd size: ", inpCmdsSize[currCmdIndex])
-							server.master_repl_offset += inpCmdsSize[currCmdIndex]
+							if server.is_replica {
+								server.master_repl_offset += inpCmdsSize[currCmdIndex]
+							}
 							
 							if len(outbytes) != 0 {
 								server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)
