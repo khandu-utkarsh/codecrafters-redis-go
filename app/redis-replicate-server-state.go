@@ -201,7 +201,7 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 				if(idx == 3 && currCmdIndex > 1) {
 					
 					server.master_repl_offset += inpCmdsSize[currCmdIndex]
-					//fmt.Println("Server size: ", server.master_repl_offset)
+					fmt.Println("Server size: ", server.master_repl_offset)
 				}
 				if len(outbytes) != 0 {
 					server.requestResponseBuffer[r.masterFd] = append(server.requestResponseBuffer[r.masterFd], outbytes...)
