@@ -276,7 +276,7 @@ func (server *RedisServer) eventLoopStart() {
 					buffer := make([]byte, 1024)
 					n, err := clientConn.Read(buffer)
 					if(err != nil) {	//!Assuming work has been done, we can close it
-						fmt.Println("Checking for data: ",string(buffer[:n]))
+						//fmt.Println("Checking for data: ",string(buffer[:n]))
 						fmt.Println("Closing fd:", fd, "|error:", err.Error())
 						clientConn.Close()
 						delete(server.clients, fd)
