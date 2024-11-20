@@ -55,10 +55,11 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, clientConn *net.TCPC
 	//	------------------------------------------------------------------------------------------  //
 	case "ping":
 		out := "+" + "PONG" + "\r\n"
-		rs, isReplica := server.state.(*ReplicaState)
-		if !(isReplica && rs.masterConn == clientConn) {
-			response = []byte(out)
-		}
+		response = []byte(out)
+		// rs, isReplica := server.state.(*ReplicaState)
+		// if !(isReplica && rs.masterConn == clientConn) {
+
+		// }
 
 	//	------------------------------------------------------------------------------------------  //
 	case "echo":
