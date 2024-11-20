@@ -112,7 +112,7 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 	// r.masterFd, _ = GetTCPConnectionFd(r.masterConn)
 
 	mcnn := conn.(*net.TCPConn)
-	mfd, _ := GetTCPConnectionFd(r.masterConn)
+	mfd, _ := GetTCPConnectionFd(mcnn)
 
 	//!Add to creation after polling, so that it is getting tracked from the start
 	server.pollFds[mfd] = unix.PollFd{ Fd: int32(mfd), Events: unix.POLLIN | unix.POLLOUT,};	//!Only polling in, won't be writing to master
