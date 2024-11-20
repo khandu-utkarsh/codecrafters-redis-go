@@ -167,7 +167,7 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 			oa[0] = createBulkString(oa[0]);
 			out = createRESPArray(oa);
 		}
-		fmt.Println("Sending out on handshake: ", out);
+		//fmt.Println("Sending out on handshake: ", out);
 		_, err = conn.Write([]byte(out))
 		if err != nil {
 			fmt.Printf("Error sending message: %v\n", err)
@@ -193,9 +193,10 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 				//fmt.Println("Cmds are: ", inputCommands)
 				outbytes, _ := server.RequestHandler(inpCmd,conn.(*net.TCPConn))
 				//fmt.Println("Curr cmd size 1: ", inpCmdsSize[currCmdIndex])
-				if(idx == 2 && currCmdIndex > 2) {
+				if(idx == 3 && currCmdIndex == 1) {
 					r.masterConn = mcnn	//!Assigning the master field
 					r.masterFd = mfd	//!Assigning the master field
+					fmt.Println("Setting it: mcnn and mfd: ", r.masterConn, " ", r.masterFd)
 				}
 				if(idx == 3 && currCmdIndex > 1) {
 					
