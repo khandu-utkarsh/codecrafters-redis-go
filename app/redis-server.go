@@ -58,8 +58,9 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, clientConn *net.TCPC
 		response = []byte(out)
 		fmt.Println("Got it from: ")
 		rs, isReplica := server.state.(*ReplicaState)
-		if(isReplica) {
+		if(isReplica && rs.masterConn == clientConn) {
 			fmt.Println("Got this from: ", rs.masterFd, " ", rs.masterConn == clientConn)
+			response = make([]byte, 0)
 		}
 	//	------------------------------------------------------------------------------------------  //
 	case "echo":
