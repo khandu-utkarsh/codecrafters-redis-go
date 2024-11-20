@@ -164,6 +164,7 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 			oa[0] = createBulkString(oa[0]);
 			out = createRESPArray(oa);
 		}
+		fmt.Println("Sending out on handshake: ", out);
 		_, err = conn.Write([]byte(out))
 		if err != nil {
 			fmt.Printf("Error sending message: %v\n", err)
