@@ -37,6 +37,7 @@ func (r *ReplicaState) HandleRequest(reqData [][]byte, server *RedisServer, clie
 			oa[1] = createBulkString("ACK");
 			oa[2] = createBulkString(strconv.Itoa(server.master_repl_offset));
 			out += createRESPArray(oa);
+			fmt.Println("Sending out: ", out);
 		}
 		response = []byte(out)
 
