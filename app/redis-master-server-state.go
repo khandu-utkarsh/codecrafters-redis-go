@@ -41,6 +41,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, server *RedisServer) ([]by
 				log.Fatalf("Error decoding rdb file content hex string: %v", rdbContentBytes)
 			}
 			prefixString := "$" + strconv.Itoa(len(rdbContentBytes)) + "\r\n"
+			fmt.Println("Prefix string: ", prefixString)
 			response = append(response, []byte(prefixString)...)
 			response = append(response, rdbContentBytes...)
 		}

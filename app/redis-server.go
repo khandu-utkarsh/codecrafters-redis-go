@@ -43,7 +43,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte) ([]byte, error) {
 
 	//!Let's parse the request here, and send it appropriately to  master or slave handle
 	//!Read request everyone can respond to
-	fmt.Println("Inside redis server request handler")
+	//fmt.Println("Inside redis server request handler")
 
 	//!Handle request on the basis of if it is a replica or master.
 	var response []byte
@@ -163,6 +163,7 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		clients:      make(map[int]*net.TCPConn),
 		pollFds:      make(map[int]unix.PollFd),
 		database:     make(map[string]ValueTickPair),
+		requestResponseBuffer: make(map[int][]byte),
 		rdbDirPath:   rdbDicPath,
 		rdbFileName:  rdbFilePath,
 	}

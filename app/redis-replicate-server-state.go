@@ -19,7 +19,7 @@ type ReplicaState struct{
 
 // HandleRequest processes the request for the replica server
 func (r *ReplicaState) HandleRequest(reqData [][]byte, server *RedisServer) ([]byte, error) {
-	fmt.Println("Replicate handling request")
+	//fmt.Println("Replicate handling request")
 
 
 	//!Handle request on the basis of if it is a replica or master.
@@ -90,7 +90,7 @@ func (r *ReplicaState) HandleRequest(reqData [][]byte, server *RedisServer) ([]b
 		
 	//	------------------------------------------------------------------------------------------  //		
 	default:
-		fmt.Println("Not implementation found in replicate state for, ", cmdName);
+		fmt.Println("Not implementation found in replicate state for cmd: ",cmdName);
 	}
 	return response, nil
 }
@@ -137,7 +137,7 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 			oa[1] = createBulkString(oa[1]);
 			oa[2] = createBulkString(oa[2]);
 			out = createRESPArray(oa);
-			fmt.Println("Index 1: ", out)
+			// fmt.Println("Index 1: ", out)
 		} else if(idx == 2) {
 			oa := make([]string, 3)
 			oa[0] = message
@@ -183,7 +183,7 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 			delete(server.clients, r.masterFd)
 			delete(server.pollFds, r.masterFd)
 		} else {
-			fmt.Println("Handshake request: ", message, " |Handshake response: ", string(buffer), " Response len: ",len(buffer[:n]));
+			//fmt.Println("Handshake request: ", message, " |Handshake response: ", string(buffer));
 			inputCommands := server.getCmdsFromInput(buffer[:n])			
 			//!Process each command individually
 			for _, inpCmd := range inputCommands{
