@@ -56,11 +56,11 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, clientConn *net.TCPC
 	case "ping":
 		out := "+" + "PONG" + "\r\n"
 		response = []byte(out)
-		// rs, isReplica := server.state.(*ReplicaState)
-		// if !(isReplica && rs.masterConn == clientConn) {
-
-		// }
-
+		fmt.Println("Got it from: ")
+		rs, isReplica := server.state.(*ReplicaState)
+		if(isReplica) {
+			fmt.Println("Got this from: ", rs.masterFd, " ", rs.masterConn)
+		}
 	//	------------------------------------------------------------------------------------------  //
 	case "echo":
 		//!Get byte array of all the rest elements
