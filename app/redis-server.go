@@ -307,6 +307,7 @@ func (server *RedisServer) eventLoopStart() {
 				// Check for write events (socket is ready to send data)
 				if pollFdsSlice[i].Revents & unix.POLLOUT != 0 {
 					if data, ok := server.requestResponseBuffer[fd]; ok && len(data) > 0 {
+						fmt.Println("Sending out: ", string(server.requestResponseBuffer[fd]))
 						clientConn.Write(server.requestResponseBuffer[fd])
 						delete(server.requestResponseBuffer, fd)
 					}
