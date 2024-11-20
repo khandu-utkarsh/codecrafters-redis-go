@@ -298,7 +298,7 @@ func (server *RedisServer) eventLoopStart() {
 								server.state.ForwardRequest(buffer[:n], server)	//!Forwarding the req to all replicas in raw byte forms
 							}
 							outbytes, _ := server.RequestHandler(inpCmd, clientConn)
-							//fmt.Println("Curr cmd size: ", inpCmdsSize[currCmdIndex])
+							fmt.Println("Curr cmd size: ", inpCmdsSize[currCmdIndex])
 							server.master_repl_offset += inpCmdsSize[currCmdIndex]
 							
 							if len(outbytes) != 0 {
