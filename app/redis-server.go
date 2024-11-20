@@ -168,6 +168,7 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		rdbDirPath:   rdbDicPath,
 		rdbFileName:  rdbFilePath,
 		master_replid: "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
+		master_repl_offset: 0,
 	}
 
 	//!As soon as we create add it to the polling. -- Helps
@@ -283,16 +284,18 @@ func (server *RedisServer) eventLoopStart() {
 					} else {
 
 						//!What I can do in this is after parsing, if it is set, then only forward it, else not
-						inputCommands := server.getCmdsFromInput(buffer[:n])
+						inputCommands, inpCmdsSize := server.getCmdsFromInput(buffer[:n])
 
 
 
 						//!Process each command individually
-						for _, inpCmd := range inputCommands{
+						for currCmdIndex, inpCmd := range inputCommands{
 							if strings.ToLower(string(inpCmd[0])) == "set" { 						//!Only forward cmds 
 								server.state.ForwardRequest(buffer[:n], server)	//!Forwarding the req to all replicas in raw byte forms
 							}
 							outbytes, _ := server.RequestHandler(inpCmd, clientConn)
+							server.master_repl_offset += inpCmdsSize[currCmdIndex]
+							
 							if len(outbytes) != 0 {
 								server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)
 							}

@@ -111,8 +111,9 @@ func (server *RedisServer) getCmdsFromRESPArray(input []byte)([][]byte, int) {
 }
 
 // parseInput validates and parses the input into a structured format
-func (server *RedisServer) getCmdsFromInput(inp []byte) ([][][]byte) {
+func (server *RedisServer) getCmdsFromInput(inp []byte) ([][][]byte, []int) {
 	var commands [][][]byte
+	var commandSizes []int
 
 	//fmt.Println("Parsing input | Input len: ", len(inp), " | Input data: ", string(inp))
 
@@ -127,6 +128,7 @@ func (server *RedisServer) getCmdsFromInput(inp []byte) ([][][]byte) {
 				cmdArray[0] = currCmd
 				bytesRead +=  br
 				commands = append(commands, cmdArray)
+				commandSizes = append(commandSizes, br)
 				//fmt.Println("Lo: + br: ", br, " ", string(currCmd))
 			case '$':	//!This could be the file or a bulk string. Asumming that clients always send array, so if we get this, then this must be the file
 				currCmd, br := server.getCmdFromFile(inp)
@@ -134,10 +136,12 @@ func (server *RedisServer) getCmdsFromInput(inp []byte) ([][][]byte) {
 				cmdArray[0] = currCmd
 				bytesRead +=  br
 				commands = append(commands, cmdArray)
-			case '*':	//!This could be the array
+				commandSizes = append(commandSizes, br)
+				case '*':	//!This could be the array
 				cmds, br := server.getCmdsFromRESPArray(inp)
 				bytesRead +=  br
 				commands = append(commands, cmds)
+				commandSizes = append(commandSizes, br)
 				//fmt.Println("Array: * br: ", bytesRead, " ", cmds)
 			default:
 				fmt.Println("Encountered something funny: ", string(curr));
@@ -149,5 +153,5 @@ func (server *RedisServer) getCmdsFromInput(inp []byte) ([][][]byte) {
 			breakEarly = true
 		}
 	}
-	return commands
+	return commands, commandSizes
 }

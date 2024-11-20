@@ -35,7 +35,7 @@ func (r *ReplicaState) HandleRequest(reqData [][]byte, server *RedisServer, clie
 			oa := make([]string, 3)
 			oa[0] = createBulkString("REPLCONF");
 			oa[1] = createBulkString("ACK");
-			oa[2] = createBulkString("0");
+			oa[2] = createBulkString(strconv.Itoa(server.master_repl_offset));
 			out += createRESPArray(oa);
 		}
 		response = []byte(out)
@@ -182,11 +182,12 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 			delete(server.pollFds, r.masterFd)
 		} else {
 			//fmt.Println("Handshake request: ", message, " |Handshake response: ", string(buffer));
-			inputCommands := server.getCmdsFromInput(buffer[:n])			
+			inputCommands, inpCmdsSize := server.getCmdsFromInput(buffer[:n])			
 			//!Process each command individually
-			for _, inpCmd := range inputCommands{
+			for currCmdIndex, inpCmd := range inputCommands{
 				//fmt.Println("Cmds are: ", inputCommands)
 				outbytes, _ := server.RequestHandler(inpCmd,conn.(*net.TCPConn))
+				server.master_repl_offset += inpCmdsSize[currCmdIndex]
 				if len(outbytes) != 0 {
 					server.requestResponseBuffer[r.masterFd] = append(server.requestResponseBuffer[r.masterFd], outbytes...)
 				}
