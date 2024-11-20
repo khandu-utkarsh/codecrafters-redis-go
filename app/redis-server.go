@@ -12,7 +12,7 @@ import (
 
 // ServerState defines common methods for both Master and Replica states
 type ServerState interface {
-	HandleRequest(reqData [][]byte, server *RedisServer) ([]byte, error)
+	HandleRequest(reqData [][]byte, server *RedisServer, clientConn *net.TCPConn) ([]byte, error)
 	ForwardRequest(reqData []byte, server *RedisServer)
 }
 
@@ -39,7 +39,7 @@ type RedisServer struct {
 }
 
 // RequestHandler processes the input and returns the response based on server state
-func (server *RedisServer) RequestHandler(reqData [][]byte) ([]byte, error) {
+func (server *RedisServer) RequestHandler(reqData [][]byte, clientConn *net.TCPConn) ([]byte, error) {
 
 	//!Let's parse the request here, and send it appropriately to  master or slave handle
 	//!Read request everyone can respond to
@@ -142,7 +142,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte) ([]byte, error) {
 		
 	//	------------------------------------------------------------------------------------------  //		
 	default:
-		response, err = server.state.HandleRequest(reqData, server)
+		response, err = server.state.HandleRequest(reqData, server, clientConn)
 	}
 	return response, err
 
@@ -164,8 +164,10 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		pollFds:      make(map[int]unix.PollFd),
 		database:     make(map[string]ValueTickPair),
 		requestResponseBuffer: make(map[int][]byte),
+		forwardingReqBuffer: make(map[int][]byte),		
 		rdbDirPath:   rdbDicPath,
 		rdbFileName:  rdbFilePath,
+		master_replid: "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
 	}
 
 	//!As soon as we create add it to the polling. -- Helps
@@ -183,7 +185,6 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 	if masterAddress == "" {
 		server.state =&MasterState{
 			replcas: make(map[int]*net.TCPConn),
-			forwardingReqBuffer: make(map[int][]byte),
 		}
 	} else {
 
@@ -282,12 +283,16 @@ func (server *RedisServer) eventLoopStart() {
 					} else {
 
 						//!What I can do in this is after parsing, if it is set, then only forward it, else not
-
-						server.state.ForwardRequest(buffer[:n], server)	//!Forwarding the req to all replicas in raw byte forms
 						inputCommands := server.getCmdsFromInput(buffer[:n])
+
+
+
 						//!Process each command individually
 						for _, inpCmd := range inputCommands{
-							outbytes, _ := server.RequestHandler(inpCmd)
+							if strings.ToLower(string(inpCmd[0])) == "set" { 						//!Only forward cmds 
+								server.state.ForwardRequest(buffer[:n], server)	//!Forwarding the req to all replicas in raw byte forms
+							}
+							outbytes, _ := server.RequestHandler(inpCmd, clientConn)
 							if len(outbytes) != 0 {
 								server.requestResponseBuffer[fd] = append(server.requestResponseBuffer[fd], outbytes...)
 							}

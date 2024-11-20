@@ -13,13 +13,11 @@ import (
 // MasterState is the state for the Redis server when it acts as a master
 type MasterState struct{
 	replcas 	map[int]*net.TCPConn	//!Fd to tcpConnection
-	forwardingReqBuffer map[int][]byte	//!Fd to data to send
-
 	//!Req, response	
 }
 
 // HandleRequest processes the request for the master server
-func (m *MasterState) HandleRequest(reqData [][]byte, server *RedisServer) ([]byte, error) {
+func (m *MasterState) HandleRequest(reqData [][]byte, server *RedisServer, clientConn *net.TCPConn) ([]byte, error) {
 	fmt.Println("Master state handling the request.")
 
 
@@ -28,6 +26,12 @@ func (m *MasterState) HandleRequest(reqData [][]byte, server *RedisServer) ([]by
 
 	cmdName := strings.ToLower(string(reqData[0]));
 	switch cmdName {		
+
+	//	------------------------------------------------------------------------------------------  //
+	case "replconf":
+			out := "+" + "OK" + "\r\n"
+			response = []byte(out)
+
 	//	------------------------------------------------------------------------------------------  //
 	case "psync":	//!Called on master
 		if string(reqData[1]) == "?" && string(reqData[2]) == "-1" {
@@ -41,9 +45,15 @@ func (m *MasterState) HandleRequest(reqData [][]byte, server *RedisServer) ([]by
 				log.Fatalf("Error decoding rdb file content hex string: %v", rdbContentBytes)
 			}
 			prefixString := "$" + strconv.Itoa(len(rdbContentBytes)) + "\r\n"
-			fmt.Println("Prefix string: ", prefixString)
+			//fmt.Println("Prefix string: ", prefixString)
 			response = append(response, []byte(prefixString)...)
 			response = append(response, rdbContentBytes...)
+			//fmt.Println("Dbg response: ", string(response))
+
+			//!Add this stage handshake has been successful, add replicas
+			cfd, _ := GetTCPConnectionFd(clientConn)
+			m.replcas[cfd] = clientConn
+
 		}
 
 	//	------------------------------------------------------------------------------------------  //

@@ -18,7 +18,7 @@ type ReplicaState struct{
 }
 
 // HandleRequest processes the request for the replica server
-func (r *ReplicaState) HandleRequest(reqData [][]byte, server *RedisServer) ([]byte, error) {
+func (r *ReplicaState) HandleRequest(reqData [][]byte, server *RedisServer, clientConn *net.TCPConn) ([]byte, error) {
 	//fmt.Println("Replicate handling request")
 
 
@@ -37,8 +37,6 @@ func (r *ReplicaState) HandleRequest(reqData [][]byte, server *RedisServer) ([]b
 			oa[1] = createBulkString("ACK");
 			oa[2] = createBulkString("0");
 			out += createRESPArray(oa);
-		} else {
-			out = "+" + "OK" + "\r\n"
 		}
 		response = []byte(out)
 
@@ -188,7 +186,7 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 			//!Process each command individually
 			for _, inpCmd := range inputCommands{
 				//fmt.Println("Cmds are: ", inputCommands)
-				outbytes, _ := server.RequestHandler(inpCmd)
+				outbytes, _ := server.RequestHandler(inpCmd,conn.(*net.TCPConn))
 				if len(outbytes) != 0 {
 					server.requestResponseBuffer[r.masterFd] = append(server.requestResponseBuffer[r.masterFd], outbytes...)
 				}
