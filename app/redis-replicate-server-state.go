@@ -107,13 +107,16 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 		return nil
 	}
 
-	//!We should add this to polling here
-	r.masterConn = conn.(*net.TCPConn)
-	r.masterFd, _ = GetTCPConnectionFd(r.masterConn)
+	// //!We should add this to polling here
+	// r.masterConn = conn.(*net.TCPConn)
+	// r.masterFd, _ = GetTCPConnectionFd(r.masterConn)
+
+	mcnn := conn.(*net.TCPConn)
+	mfd, _ := GetTCPConnectionFd(r.masterConn)
 
 	//!Add to creation after polling, so that it is getting tracked from the start
-	server.pollFds[r.masterFd] = unix.PollFd{ Fd: int32(r.masterFd), Events: unix.POLLIN | unix.POLLOUT,};	//!Only polling in, won't be writing to master
-	server.clients[r.masterFd] = r.masterConn	//!Map of fd to tcpConns
+	server.pollFds[mfd] = unix.PollFd{ Fd: int32(mfd), Events: unix.POLLIN | unix.POLLOUT,};	//!Only polling in, won't be writing to master
+	server.clients[mfd] = mcnn	//!Map of fd to tcpConns
 
 	fmt.Printf("Connected to server at %s\n", r.masterAddress)
 
@@ -190,7 +193,10 @@ func (r * ReplicaState) doReplicationHandshake(server *RedisServer) (*net.TCPCon
 				//fmt.Println("Cmds are: ", inputCommands)
 				outbytes, _ := server.RequestHandler(inpCmd,conn.(*net.TCPConn))
 				//fmt.Println("Curr cmd size 1: ", inpCmdsSize[currCmdIndex])
-
+				if(idx == 2 && currCmdIndex > 2) {
+					r.masterConn = mcnn	//!Assigning the master field
+					r.masterFd = mfd	//!Assigning the master field
+				}
 				if(idx == 3 && currCmdIndex > 1) {
 					
 					server.master_repl_offset += inpCmdsSize[currCmdIndex]
