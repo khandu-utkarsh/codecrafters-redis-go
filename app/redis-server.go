@@ -240,6 +240,8 @@ func (server *RedisServer) processTimers() {
 	now := time.Now()
 	activeTimers := make([]Timer, 0, len(server.timers))
 
+	fmt.Println("Inside the process timer. No of timers are: ", server.timers)
+
 	for _, timer := range server.timers {
 		if timer.expiry.Before(now) {
 			fmt.Println("Timer expired.")

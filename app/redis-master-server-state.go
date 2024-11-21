@@ -143,6 +143,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 					server.requestResponseBuffer[rfd] = []byte(createGetAckString())
 				}
 				m.replicaAckAsked = rep_count_asked
+				fmt.Println("Added the timer")
 				server.AddTimer(time.Duration(timeout_provided)*time.Millisecond, func() {
 					replicasCount := m.replicaAckAnswered
 					output := createIntegerString(replicasCount)
