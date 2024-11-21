@@ -151,7 +151,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 					response = []byte(output)
 					clientConn.Write(response)	//!Writing the reponse on callback, once this timer is executed
 				})
-				fmt.Println("Timers after addition: ", len(server.timers))
+				fmt.Println("Timers after addition: ", len(server.timers), " | ", server.timers)
 			}
 		}
 
