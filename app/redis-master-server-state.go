@@ -130,7 +130,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 
 			if len(m.replcas) == 0 {
 				//!Send instant response
-				fmt.Println("Entering this zero replica thing: ")
+				//fmt.Println("Entering this zero replica thing: ")
 				out := createIntegerString(len(m.replcas))
 				response = []byte(out)
 			} else {
