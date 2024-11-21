@@ -32,11 +32,10 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 
 	//	------------------------------------------------------------------------------------------  //
 	case "replconf":
+		if len(reqData) == 3 && (string(reqData[1]) == "listening-port") || (string(reqData[1]) == "capa" && string(reqData[2]) == "psync2") {
 			out := "+" + "OK" + "\r\n"
 			response = []byte(out)
-
-		//!Add a case here
-		if len(reqData) == 3 && string(reqData[1]) == "ACK" {
+		} else if len(reqData) == 3 && string(reqData[1]) == "ACK" {
 
 			fmt.Println("Testing...", m.replicaAckAnswered, " and we asked for: ", m.replicaAckAsked)
 			conn_repl_offset, _ := strconv.Atoi(string(reqData[2]))
@@ -49,6 +48,8 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 				server.timers[0].callback()	//!This should execute the timer for sure.
 				server.timers = make([]Timer, 0)
 			}
+		} else {
+			fmt.Println("Don't know what to do here in replconf");
 		}
 
 	//	------------------------------------------------------------------------------------------  //
