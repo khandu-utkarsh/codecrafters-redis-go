@@ -146,10 +146,10 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 				m.replicaAckAsked = rep_count_asked
 				fmt.Println("Added the timer")
 				server.AddTimer(time.Duration(timeout_provided)*time.Millisecond, func() {
-					replicasCount := m.replicaAckAnswered
-					output := createIntegerString(replicasCount)
+					output := createIntegerString(m.replicaAckAnswered)
 					response = []byte(output)
 					clientConn.Write(response)	//!Writing the reponse on callback, once this timer is executed
+					fmt.Println("Writing inside callback: ", string(response))
 				})
 				fmt.Println("Timers after addition: ", len(server.timers), " | ", server.timers)
 			}
