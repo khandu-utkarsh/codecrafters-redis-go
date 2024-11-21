@@ -37,6 +37,8 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 
 		//!Add a case here
 		if len(reqData) == 3 && string(reqData[1]) == "ACK" {
+
+			fmt.Println("Testing...", m.replicaAckAnswered, " and we asked for: ", m.replicaAckAsked)
 			conn_repl_offset, _ := strconv.Atoi(string(reqData[2]))
 			connFd, _ := GetTCPConnectionFd(clientConn)
 			m.replicasOffset[connFd] = conn_repl_offset
