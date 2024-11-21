@@ -42,7 +42,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			m.replicasOffset[connFd] = conn_repl_offset
 			m.replicaAckAnswered++;
 			if(m.replicaAckAnswered >= m.replicaAckAsked) {
-				fmt.Println("Enough acks rec...")
+				fmt.Println("Enough acks rec...", m.replicaAckAnswered, " and we asked for: ", m.replicaAckAsked)
 				server.timers[0].callback()	//!This should execute the timer for sure.
 				server.timers = make([]Timer, 0)
 			}
