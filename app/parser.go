@@ -28,7 +28,7 @@ func createIntegerString(inp int) (string) {
 }
 
 func createGetAckString() (string) {
-	return "*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n"
+	return "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n"
 }
 
 
