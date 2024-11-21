@@ -42,7 +42,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			m.replicasOffset[connFd] = conn_repl_offset
 			m.replicaAckAnswered++;
 			if(m.replicaAckAnswered >= m.replicaAckAsked) {
-				//!Hard coded assumption, that we can only have one timer
+				fmt.Println("Enough acks rec...")
 				server.timers[0].callback()	//!This should execute the timer for sure.
 				server.timers = make([]Timer, 0)
 			}
@@ -99,6 +99,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			out := "+" + "OK" + "\r\n"			
 			response = []byte(out)
 			fmt.Println("Here in set: ", server.database)
+			server.cmdProcessed ++;
 		}
 
 
@@ -128,7 +129,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			timeout_provided, _ := strconv.Atoi(string(reqData[2]))
 
 
-			if len(m.replcas) == 0 {
+			if len(m.replcas) == 0 || server.cmdProcessed == 0 {
 				//!Send instant response
 				//fmt.Println("Entering this zero replica thing: ")
 				out := createIntegerString(len(m.replcas))
@@ -143,7 +144,6 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 				server.AddTimer(time.Duration(timeout_provided)*time.Millisecond, func() {
 					replicasCount := m.replicaAckAnswered
 					output := createIntegerString(replicasCount)
-					fmt.Printf("Timer expired: Wait output generated: %s\n", string(output))
 					response = []byte(output)
 					clientConn.Write(response)	//!Writing the reponse on callback, once this timer is executed
 				})

@@ -34,7 +34,7 @@ type RedisServer struct {
 	//!Req, response
 	requestResponseBuffer map[int][]byte	//!Fd tp response
 	forwardingReqBuffer map[int][]byte //!Fd to forwarding req
-
+	cmdProcessed int
 	timers                []Timer
 
 	rdbDirPath string
@@ -174,6 +174,7 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		rdbFileName:  rdbFilePath,
 		master_replid: "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
 		master_repl_offset: 0,
+		cmdProcessed: 0,
 	}
 
 	//!As soon as we create add it to the polling. -- Helps
@@ -241,6 +242,7 @@ func (server *RedisServer) processTimers() {
 
 	for _, timer := range server.timers {
 		if timer.expiry.Before(now) {
+			fmt.Println("Timer expired.")
 			timer.callback() // Execute the callback
 		} else {
 			activeTimers = append(activeTimers, timer)
@@ -348,7 +350,7 @@ func (server *RedisServer) eventLoopStart() {
 								server.state.ForwardRequest(buffer[:n], server)	//!Forwarding the req to all replicas in raw byte forms
 							}
 							outbytes, _ := server.RequestHandler(inpCmd, inpCmdsSize[currCmdIndex], clientConn)
-							fmt.Println("Curr cmd size: ", inpCmdsSize[currCmdIndex])
+							//fmt.Println("Curr cmd size: ", inpCmdsSize[currCmdIndex])
 							if server.is_replica {
 								server.master_repl_offset += inpCmdsSize[currCmdIndex]
 							}
@@ -363,7 +365,7 @@ func (server *RedisServer) eventLoopStart() {
 				// Check for write events (socket is ready to send data)
 				if pollFdsSlice[i].Revents & unix.POLLOUT != 0 {
 					if data, ok := server.requestResponseBuffer[fd]; ok && len(data) > 0 {
-						fmt.Println("Sending out: ", string(server.requestResponseBuffer[fd]))
+						//fmt.Println("Sending out: ", string(server.requestResponseBuffer[fd]))
 						clientConn.Write(server.requestResponseBuffer[fd])
 						delete(server.requestResponseBuffer, fd)
 					}
