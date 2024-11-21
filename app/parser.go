@@ -24,7 +24,7 @@ func createRESPArray(inparray []string) (string) {
 }
 
 func createIntegerString(inp int) (string) {
-	return "$" + strconv.Itoa(inp) + "\r\n"
+	return ":" + strconv.Itoa(inp) + "\r\n"
 }
 
 func createGetAckString() (string) {
