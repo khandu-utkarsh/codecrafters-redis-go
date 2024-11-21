@@ -12,7 +12,7 @@ import (
 
 // ServerState defines common methods for both Master and Replica states
 type ServerState interface {
-	HandleRequest(reqData [][]byte, server *RedisServer, clientConn *net.TCPConn) ([]byte, error)
+	HandleRequest(reqData [][]byte, reqSize int, server *RedisServer, clientConn *net.TCPConn) ([]byte, error)
 	ForwardRequest(reqData []byte, server *RedisServer)
 }
 
@@ -35,16 +35,14 @@ type RedisServer struct {
 	requestResponseBuffer map[int][]byte	//!Fd tp response
 	forwardingReqBuffer map[int][]byte //!Fd to forwarding req
 
+	timers                []Timer
+
 	rdbDirPath string
 	rdbFileName string
 }
 
 // RequestHandler processes the input and returns the response based on server state
-func (server *RedisServer) RequestHandler(reqData [][]byte, clientConn *net.TCPConn) ([]byte, error) {
-
-	//!Let's parse the request here, and send it appropriately to  master or slave handle
-	//!Read request everyone can respond to
-	//fmt.Println("Inside redis server request handler")
+func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientConn *net.TCPConn) ([]byte, error) {
 
 	//!Handle request on the basis of if it is a replica or master.
 	var response []byte
@@ -148,7 +146,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, clientConn *net.TCPC
 		
 	//	------------------------------------------------------------------------------------------  //		
 	default:
-		response, err = server.state.HandleRequest(reqData, server, clientConn)
+		response, err = server.state.HandleRequest(reqData, reqSize, server, clientConn)
 	}
 	return response, err
 
@@ -170,7 +168,8 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		pollFds:      make(map[int]unix.PollFd),
 		database:     make(map[string]ValueTickPair),
 		requestResponseBuffer: make(map[int][]byte),
-		forwardingReqBuffer: make(map[int][]byte),		
+		forwardingReqBuffer: make(map[int][]byte),	
+		timers: make([]Timer, 0),	
 		rdbDirPath:   rdbDicPath,
 		rdbFileName:  rdbFilePath,
 		master_replid: "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
@@ -192,6 +191,7 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 	if masterAddress == "" {
 		server.state =&MasterState{
 			replcas: make(map[int]*net.TCPConn),
+			replicasOffset: make(map[int]int),
 		}
 		server.is_replica = false
 	} else {
@@ -221,17 +221,39 @@ func (server *RedisServer) SwitchToReplica() {
 	server.state = &ReplicaState{}
 }
 
+
+//!Adding the support of timer to my event loop
+type Timer struct {
+	expiry  time.Time
+	callback func()
+}
+
+// Add a timer to the server's timer list
+func (server *RedisServer) AddTimer(duration time.Duration, callback func()) {
+	expiry := time.Now().Add(duration)
+	server.timers = append(server.timers, Timer{expiry: expiry, callback: callback})
+}
+
+// Check and execute expired timers
+func (server *RedisServer) processTimers() {
+	now := time.Now()
+	activeTimers := make([]Timer, 0, len(server.timers))
+
+	for _, timer := range server.timers {
+		if timer.expiry.Before(now) {
+			timer.callback() // Execute the callback
+		} else {
+			activeTimers = append(activeTimers, timer)
+		}
+	}
+	server.timers = activeTimers // Keep only non-expired timers
+}
+
+
+
 func (server *RedisServer) eventLoopStart() {
 	fmt.Println("Inside event loop")
-	//!Getting done on creation
-	// // Add listener FD to pollFds for read events
-	// listenerFd, _ := GetTCPListenerFd(server.listener)
-	// lfd := int(listenerFd)
-	//server.pollFds[lfd] = unix.PollFd{Fd: int32(lfd), Events: unix.POLLIN};
 	fmt.Println("PollFds on event loop start: ", server.pollFds)
-
-	// ms, msok := server.state.(*MasterState)
-	// rs, rsok := server.state.(*ReplicaState)
 
 	// Main event loop
 	for {	
@@ -242,12 +264,37 @@ func (server *RedisServer) eventLoopStart() {
 		for _, pfd := range server.pollFds {
 			pollFdsSlice = append(pollFdsSlice, pfd);
 		}
+
+
+		//!Determine the timeout for polling,
+		timeout := -1 // Default: wait indefinitely for I/O events
+		if len(server.timers) > 0 {
+			now := time.Now()
+			nearestTimer := server.timers[0].expiry
+			for _, timer := range server.timers {
+				if timer.expiry.Before(nearestTimer) {
+					nearestTimer = timer.expiry
+				}
+			}
+			timeToNextTimer := nearestTimer.Sub(now)
+			if timeToNextTimer < 0 {
+				timeToNextTimer = 0
+			}
+			timeout = int(timeToNextTimer.Milliseconds())
+		}
+	
+		//! Poll for events
+		n, err := unix.Poll(pollFdsSlice, timeout) // Wait for I/O events or timeout
 		// Poll for events
-		n, err := unix.Poll(pollFdsSlice, -1) // Wait indefinitely for I/O events
+		//n, err := unix.Poll(pollFdsSlice, -1) // Wait indefinitely for I/O events
 		if err != nil {
 			fmt.Println("Error polling:", err)
 			break
 		}
+
+
+		//! Process expired timers
+		server.processTimers()
 
 		lfd, _ := GetTCPListenerFd(server.listener)
 		// Handle each event
@@ -300,7 +347,7 @@ func (server *RedisServer) eventLoopStart() {
 							if strings.ToLower(string(inpCmd[0])) == "set" { 						//!Only forward cmds 
 								server.state.ForwardRequest(buffer[:n], server)	//!Forwarding the req to all replicas in raw byte forms
 							}
-							outbytes, _ := server.RequestHandler(inpCmd, clientConn)
+							outbytes, _ := server.RequestHandler(inpCmd, inpCmdsSize[currCmdIndex], clientConn)
 							fmt.Println("Curr cmd size: ", inpCmdsSize[currCmdIndex])
 							if server.is_replica {
 								server.master_repl_offset += inpCmdsSize[currCmdIndex]
@@ -328,6 +375,7 @@ func (server *RedisServer) eventLoopStart() {
 				}
 			}
 		}
+		
 	}
 	fmt.Println("Closing the event loop")
 }

@@ -23,6 +23,15 @@ func createRESPArray(inparray []string) (string) {
 
 }
 
+func createIntegerString(inp int) (string) {
+	return "$" + strconv.Itoa(inp) + "\r\n"
+}
+
+func createGetAckString() (string) {
+	return "*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n"
+}
+
+
 //	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//
 //!Input fxns
 //	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//

@@ -13,11 +13,14 @@ import (
 // MasterState is the state for the Redis server when it acts as a master
 type MasterState struct{
 	replcas 	map[int]*net.TCPConn	//!Fd to tcpConnection
+	replicasOffset map[int]int	//!Replica offset information
+	replicaAckAnswered int
+	replicaAckAsked int
 	//!Req, response	
 }
 
 // HandleRequest processes the request for the master server
-func (m *MasterState) HandleRequest(reqData [][]byte, server *RedisServer, clientConn *net.TCPConn) ([]byte, error) {
+func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *RedisServer, clientConn *net.TCPConn) ([]byte, error) {
 	fmt.Println("Master state handling the request.")
 
 
@@ -31,6 +34,19 @@ func (m *MasterState) HandleRequest(reqData [][]byte, server *RedisServer, clien
 	case "replconf":
 			out := "+" + "OK" + "\r\n"
 			response = []byte(out)
+
+		//!Add a case here
+		if len(reqData) == 3 && string(reqData[1]) == "ACK" {
+			conn_repl_offset, _ := strconv.Atoi(string(reqData[2]))
+			connFd, _ := GetTCPConnectionFd(clientConn)
+			m.replicasOffset[connFd] = conn_repl_offset
+			m.replicaAckAnswered++;
+			if(m.replicaAckAnswered >= m.replicaAckAsked) {
+				//!Hard coded assumption, that we can only have one timer
+				server.timers[0].callback()	//!This should execute the timer for sure.
+				server.timers = make([]Timer, 0)
+			}
+		}
 
 	//	------------------------------------------------------------------------------------------  //
 	case "psync":	//!Called on master
@@ -53,7 +69,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, server *RedisServer, clien
 			//!Add this stage handshake has been successful, add replicas
 			cfd, _ := GetTCPConnectionFd(clientConn)
 			m.replcas[cfd] = clientConn
-
+			m.replicasOffset[cfd] = 0	//!Since we recv -1  in req, means it is just starting
 		}
 
 	//	------------------------------------------------------------------------------------------  //
@@ -102,6 +118,37 @@ func (m *MasterState) HandleRequest(reqData [][]byte, server *RedisServer, clien
 				response = []byte(out)
 			}	
 		}	
+
+	//	------------------------------------------------------------------------------------------  //		
+	case "wait":
+		if(len(reqData) < 3) {
+			fmt.Println("Not all cmds passed with WAIT.")
+		} else {
+			rep_count_asked, _ := strconv.Atoi(string(reqData[1]))
+			timeout_provided, _ := strconv.Atoi(string(reqData[2]))
+
+
+			if len(m.replcas) == 0 {
+				//!Send instant response
+				out := createIntegerString(len(m.replcas))
+				response = []byte(out)
+			} else {
+				m.replicaAckAnswered = 0
+				//!Message all replicas that request offset
+				for rfd :=range m.replcas {
+					server.requestResponseBuffer[rfd] = []byte(createGetAckString())
+				}
+				m.replicaAckAsked = rep_count_asked
+				server.AddTimer(time.Duration(timeout_provided)*time.Millisecond, func() {
+					replicasCount := m.replicaAckAnswered
+					output := createIntegerString(replicasCount)
+					fmt.Printf("Timer expired: Wait output generated: %s\n", string(output))
+					response = []byte(output)
+					clientConn.Write(response)	//!Writing the reponse on callback, once this timer is executed
+				})
+			}
+		}
+
 
 	//	------------------------------------------------------------------------------------------  //		
 	default:
