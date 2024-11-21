@@ -351,6 +351,7 @@ func (server *RedisServer) eventLoopStart() {
 						//!Process each command individually
 						for currCmdIndex, inpCmd := range inputCommands{
 							if strings.ToLower(string(inpCmd[0])) == "set" { 						//!Only forward cmds 
+								fmt.Println("Forwarding following bytes: ", buffer[:n])								
 								server.state.ForwardRequest(buffer[:n], server)	//!Forwarding the req to all replicas in raw byte forms
 							}
 							outbytes, _ := server.RequestHandler(inpCmd, inpCmdsSize[currCmdIndex], clientConn)
