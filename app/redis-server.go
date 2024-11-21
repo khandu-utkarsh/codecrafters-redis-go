@@ -240,7 +240,7 @@ func (server *RedisServer) processTimers() {
 	now := time.Now()
 	activeTimers := make([]Timer, 0, len(server.timers))
 	if len(server.timers) > 0 {
-		fmt.Println("Inside the process timer. No of timers are: ", server.timers)
+		//fmt.Println("Inside the process timer. No of timers are: ", server.timers)
 	}
 
 
