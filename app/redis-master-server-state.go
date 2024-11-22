@@ -87,6 +87,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			//!Check if information of time present
 			var vt ValueTickPair;
 			vt.value = value;
+			vt.keyType = "string"
 			if len(reqData) > 3 {	//!Time included
 				timeUnit := strings.ToLower(string(reqData[3]))
 				timeDuration, _ := strconv.Atoi(string(reqData[4]))

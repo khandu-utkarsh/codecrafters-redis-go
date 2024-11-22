@@ -144,6 +144,20 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			}
 		}
 		
+	//	------------------------------------------------------------------------------------------  //
+	case "type":
+		if(len(reqData) < 2) {
+			fmt.Println("Minimum args req are 2")
+		} else {
+			var out string
+			vt, ok := server.database[string(reqData[1])]		
+			if ok {
+					out = ":" + vt.keyType + "\r\n"
+				} else {
+					out = ":" + "none" + "\r\n"
+				}
+			response = []byte(out)
+		}
 	//	------------------------------------------------------------------------------------------  //		
 	default:
 		response, err = server.state.HandleRequest(reqData, reqSize, server, clientConn)

@@ -12,6 +12,7 @@ import (
 type ValueTickPair struct {
 	value           string
 	tickUnixNanoSec int64
+	keyType	string
 }
 
 // GetTCPListenerFd takes a *net.TCPListener and returns its underlying file descriptor.
@@ -131,6 +132,7 @@ func (rdb *RDBFileManager) ParseEntry(buffer []byte, server *RedisServer) int64 
 
 	key, vt, bytesRead := rdb.ParseDictEntry(buffer[i:])
 	vt.tickUnixNanoSec = expiration
+	vt.keyType = "string"
 	i += bytesRead
 	server.database[key] = vt
 	fmt.Println("parsed entry | key:", key, " value:", vt.value, " expiry in ns:", vt.tickUnixNanoSec)
