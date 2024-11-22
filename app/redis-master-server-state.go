@@ -145,6 +145,9 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 				lastEntryId := "0-0"
 				validated := validateString(entryId, lastEntryId)
 				if(validated) {
+
+					sv.entries = append(sv.entries, sentry)
+
 					server.database_stream[skey] = sv
 					out = createBulkString(entryId);
 				} else {
