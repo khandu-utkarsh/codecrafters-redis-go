@@ -6,6 +6,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 // ValueTickPair for value and time pair
@@ -207,4 +209,38 @@ func (rdb *RDBFileManager) LoadDatabase(server *RedisServer) {
 		index += br
 		currByte = buffer[index]
 	}
+}
+
+func splitSteamId(inp string) (int, int) {
+
+	dashIndex := strings.Index(inp, "-")
+	if dashIndex == -1 {
+		fmt.Println("What is this stream id: ", inp);
+		return 0, 0	//!This is error
+	}
+
+	timeMillisecond := inp[:dashIndex]
+	sqNo := inp[dashIndex + 1: ]
+
+	timeInInt, _ := strconv.Atoi(timeMillisecond)
+	seqNoInt, _ := strconv.Atoi(sqNo)
+	return timeInInt, seqNoInt
+}
+
+func validateString(inp string, last string) bool {	
+	it, is := splitSteamId(inp)
+	lt, ls := splitSteamId(last)
+	
+	if(it > lt) {
+		return true
+	} else if(it == lt) {
+		if(is > ls) {
+			return true
+		} else {
+			return false
+		}
+	}
+	return false
+	
+
 }

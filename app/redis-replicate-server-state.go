@@ -89,13 +89,29 @@ func (r *ReplicaState) HandleRequest(reqData [][]byte, reqSize int, server *Redi
 			sentry.id = entryId
 			sentry.kvpairs = ess
 			
+			//!Before pushing it, validate it			
 			sv, ok := server.database_stream[skey]
 			if ok {
 				//!Already there, just append it
-				sv.entries = append(sv.entries, sentry)
-				server.database_stream[skey] = sv
+				lastEntryId := sv.entries[len(sv.entries) - 1].id
+				validated := validateString(entryId, lastEntryId)
+				if(validated) {
+					sv.entries = append(sv.entries, sentry)
+					server.database_stream[skey] = sv
+				} else {
+					//Not possible to add
+				}
+
+
 			} else {
-				server.database_stream[skey] = sv
+				lastEntryId := "0-0"
+				validated := validateString(entryId, lastEntryId)
+				if(validated) {
+					server.database_stream[skey] = sv
+
+				} else {
+					//Not possible to add
+				}
 			}
 			//out := createBulkString(entryId);
 		}	
