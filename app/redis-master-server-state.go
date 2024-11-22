@@ -129,30 +129,20 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			//!Before pushing it, validate it			
 			var out string
 			sv, ok := server.database_stream[skey]
+
+			lastEntryId := "0-0"
+			validated := false
 			if ok {
-				//!Already there, just append it
-				lastEntryId := sv.entries[len(sv.entries) - 1].id
-				validated := validateString(entryId, lastEntryId)
-				if(validated) {
-					sv.entries = append(sv.entries, sentry)
-					server.database_stream[skey] = sv
-					out = createBulkString(entryId);					
-				} else {
-					out = createBulkString("ERR The ID specified in XADD is equal or smaller than the target stream top item");
-					//Not possible to add
-				}
+				lastEntryId = sv.entries[len(sv.entries) - 1].id
+			}
+			validated = validateString(entryId, lastEntryId)
+			if(validated) {
+				sv.entries = append(sv.entries, sentry)
+				server.database_stream[skey] = sv
+				out = createBulkString(entryId);					
 			} else {
-				lastEntryId := "0-0"
-				validated := validateString(entryId, lastEntryId)
-				if(validated) {
-
-					sv.entries = append(sv.entries, sentry)
-
-					server.database_stream[skey] = sv
-					out = createBulkString(entryId);
-				} else {
-					out = createBulkString("ERR The ID specified in XADD is equal or smaller than the target stream top item");
-				}
+				out = "-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n";
+				//Not possible to add
 			}
 			fmt.Println("Printing stream database: ", server.database_stream)
 			response = []byte(out)

@@ -90,28 +90,22 @@ func (r *ReplicaState) HandleRequest(reqData [][]byte, reqSize int, server *Redi
 			sentry.kvpairs = ess
 			
 			//!Before pushing it, validate it			
+			//var out string
 			sv, ok := server.database_stream[skey]
+
+			lastEntryId := "0-0"
+			validated := false
 			if ok {
-				//!Already there, just append it
-				lastEntryId := sv.entries[len(sv.entries) - 1].id
-				validated := validateString(entryId, lastEntryId)
-				if(validated) {
-					sv.entries = append(sv.entries, sentry)
-					server.database_stream[skey] = sv
-				} else {
-					//Not possible to add
-				}
-
-
+				lastEntryId = sv.entries[len(sv.entries) - 1].id
+			}
+			validated = validateString(entryId, lastEntryId)
+			if(validated) {
+				sv.entries = append(sv.entries, sentry)
+				server.database_stream[skey] = sv
+				//out = createBulkString(entryId);					
 			} else {
-				lastEntryId := "0-0"
-				validated := validateString(entryId, lastEntryId)
-				if(validated) {
-					server.database_stream[skey] = sv
-
-				} else {
-					//Not possible to add
-				}
+				//out = createBulkString("ERR The ID specified in XADD is equal or smaller than the target stream top item");
+				//Not possible to add
 			}
 			//out := createBulkString(entryId);
 		}	
