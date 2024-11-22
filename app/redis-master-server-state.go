@@ -151,6 +151,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 					out = createBulkString("ERR The ID specified in XADD is equal or smaller than the target stream top item");
 				}
 			}
+			fmt.Println("Printing stream database: ", server.database_stream)
 			response = []byte(out)
 		}	
 	
