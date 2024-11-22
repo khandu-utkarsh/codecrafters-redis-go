@@ -227,20 +227,23 @@ func splitSteamId(inp string) (int, int) {
 	return timeInInt, seqNoInt
 }
 
-func validateString(inp string, last string) bool {	
+func validateString(inp string, last string) (bool, string) {	
 	it, is := splitSteamId(inp)
+
+	if(inp == "0-0") {
+		return false, "-ERR The ID specified in XADD must be greater than 0-0\r\n"
+	}
 	lt, ls := splitSteamId(last)
-	
 	if(it > lt) {
-		return true
+		return true, ""
 	} else if(it == lt) {
 		if(is > ls) {
-			return true
+			return true, ""
 		} else {
-			return false
+			return false, "-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n"	
 		}
 	}
-	return false
+	return false, "-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n"
 	
 
 }

@@ -131,18 +131,16 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			sv, ok := server.database_stream[skey]
 
 			lastEntryId := "0-0"
-			validated := false
 			if ok {
 				lastEntryId = sv.entries[len(sv.entries) - 1].id
 			}
-			validated = validateString(entryId, lastEntryId)
+			validated, errString := validateString(entryId, lastEntryId)
 			if(validated) {
 				sv.entries = append(sv.entries, sentry)
 				server.database_stream[skey] = sv
 				out = createBulkString(entryId);					
 			} else {
-				out = "-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n";
-				//Not possible to add
+				out = errString
 			}
 			fmt.Println("Printing stream database: ", server.database_stream)
 			response = []byte(out)
