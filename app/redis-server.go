@@ -152,9 +152,9 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			var out string
 			vt, ok := server.database[string(reqData[1])]		
 			if ok {
-					out = ":" + vt.keyType + "\r\n"
+					out = "+" + vt.keyType + "\r\n"
 				} else {
-					out = ":" + "none" + "\r\n"
+					out = "+" + "none" + "\r\n"
 				}
 			response = []byte(out)
 		}
