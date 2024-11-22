@@ -15,6 +15,21 @@ type ValueTickPair struct {
 	keyType	string
 }
 
+type FundamentalStreamEntry struct {
+	key string
+	value string
+}
+
+type StreamEntry struct {
+	id string
+	kvpairs []FundamentalStreamEntry
+}
+
+
+type StreamValue struct {
+	entries []StreamEntry
+}
+
 // GetTCPListenerFd takes a *net.TCPListener and returns its underlying file descriptor.
 func GetTCPListenerFd(tcpListener *net.TCPListener) (int, error) {
 	conn, err := tcpListener.SyscallConn()

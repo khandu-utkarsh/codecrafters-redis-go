@@ -31,6 +31,7 @@ type RedisServer struct {
 	pollFds     map[int]unix.PollFd	//!Fd to unix polling objs
 	clients     map[int]*net.TCPConn
 	database    map[string]ValueTickPair
+	database_stream map[string]StreamValue
 	//!Req, response
 	requestResponseBuffer map[int][]byte	//!Fd tp response
 	forwardingReqBuffer map[int][]byte //!Fd to forwarding req
@@ -150,12 +151,15 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			fmt.Println("Minimum args req are 2")
 		} else {
 			var out string
-			vt, ok := server.database[string(reqData[1])]		
-			if ok {
-					out = "+" + vt.keyType + "\r\n"
-				} else {
-					out = "+" + "none" + "\r\n"
-				}
+			vt, okd := server.database[string(reqData[1])]		
+			_, oks := server.database_stream[string(reqData[1])]
+			if okd {
+				out = "+" + vt.keyType + "\r\n"
+			} else if oks {
+				out = "+" + "stream" + "\r\n"
+			} else {
+				out = "+" + "none" + "\r\n"
+			}
 			response = []byte(out)
 		}
 	//	------------------------------------------------------------------------------------------  //		
@@ -181,6 +185,7 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		clients:      make(map[int]*net.TCPConn),
 		pollFds:      make(map[int]unix.PollFd),
 		database:     make(map[string]ValueTickPair),
+		database_stream: make(map[string]StreamValue),
 		requestResponseBuffer: make(map[int][]byte),
 		forwardingReqBuffer: make(map[int][]byte),	
 		timers: make([]Timer, 0),	

@@ -107,7 +107,37 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			server.cmdProcessed ++;
 		}
 
+	//	------------------------------------------------------------------------------------------  //
+	case "xadd":
+		if(len(reqData) < 2) {
+			fmt.Println("Min agrs needed by ", string(reqData[0]), " are more then 2.")
+		} else {
+			skey := string(reqData[1]);			
+			entryId:= string(reqData[2])
 
+			ess := make([]FundamentalStreamEntry, 0)
+			for i:= 3; i < len(reqData);i = i + 2 {
+				currk:= string(reqData[i])
+				cv := string(reqData[i + 1])
+				fe := FundamentalStreamEntry{key: currk, value: cv}
+				ess = append(ess, fe)
+			}
+			sentry := StreamEntry{}
+			sentry.id = entryId
+			sentry.kvpairs = ess
+			
+			sv, ok := server.database_stream[skey]
+			if ok {
+				//!Already there, just append it
+				sv.entries = append(sv.entries, sentry)
+				server.database_stream[skey] = sv
+			} else {
+				server.database_stream[skey] = sv
+			}
+			out := createBulkString(entryId);
+			response = []byte(out)
+		}	
+	
 	//	------------------------------------------------------------------------------------------  //
 	case "info":
 		if(len(reqData) < 2) {
