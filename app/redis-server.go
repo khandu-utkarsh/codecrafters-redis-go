@@ -180,7 +180,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			} else {
 
 				var inRangeEntries []StreamEntry
-				for i, entry := range v.entries {
+				for _, entry := range v.entries {
 					if(entry.id >= start && entry.id <= end) {
 						inRangeEntries = append(inRangeEntries, entry)
 					}
