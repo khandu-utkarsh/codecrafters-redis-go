@@ -467,14 +467,14 @@ func (server *RedisServer) ProcessQueue(cfd int) string {
 	if !ok {
 		fmt.Println("Shouldn't be the case usually...")
 	}
-
+	delete(server.databaseQueuedCmd, cfd)
 	for i, c := range qc.cmdsInpData {
 		cmdOut, _ := server.RequestHandler(c, qc.cmdReqSize[i], server.clients[cfd])
 		outa = append(outa, string(cmdOut))
 	}
 	
 	oa := createRESPArray(outa)
-	delete(server.databaseQueuedCmd, cfd)
+
 	return oa
 }
 
