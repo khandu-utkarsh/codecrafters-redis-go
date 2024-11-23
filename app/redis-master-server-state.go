@@ -112,6 +112,8 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 		if(len(reqData) < 2) {
 			fmt.Println("Minimum args req are 2")
 		} else {
+			
+			var out string
 			key := string(reqData[1]);
 			
 			vt, ok := server.database[key]			
@@ -119,8 +121,8 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 				vt = ValueTickPair{value: "1", tickUnixNanoSec: -1}
 			} else {
 				iv, err := strconv.Atoi(vt.value)
-				fmt.Println("Value of iv before: ", iv)
 				if err != nil {
+					out = "-ERR value is not an integer or out of range\r\n"
 					fmt.Println("Have to implment for this case.")
 				} else {
 					iv++;
@@ -130,7 +132,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			}
 			server.database[key] = vt;
 			fmt.Println("Here in incr: ", server.database)		
-			out := ":" + vt.value + "\r\n"	
+			out = ":" + vt.value + "\r\n"	
 			response = []byte(out)
 			server.cmdProcessed ++;
 		}
