@@ -150,6 +150,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			//!New entry pushed, check if any pending xread command, if yes this is the time to execute
 			for k, sc := range server.database_stream_xread_fxns {
 				if k == skey {
+					fmt.Println("Executing callback on xread: ")
 					sc.Callback()
 					for _, dk := range sc.Streams {
 						delete( server.database_stream_xread_fxns, dk)

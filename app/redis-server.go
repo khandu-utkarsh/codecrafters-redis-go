@@ -250,6 +250,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 		}
 
 		callbackFunc := func() {
+			fmt.Println("Started to execute the callback of xread: ")
 			var outSteamWise []string
 			tend := time.Now().UnixNano() / int64(time.Millisecond) + 100000
 			end := strconv.Itoa(int(tend))
