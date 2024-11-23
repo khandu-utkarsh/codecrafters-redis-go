@@ -55,10 +55,11 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 
 	cmdName := strings.ToLower(string(reqData[0]));
 	cfd, _ := GetTCPConnectionFd(clientConn)
-	qcp, ok := server.databaseQueuedCmd[cfd]	
+	qcp, ok := server.databaseQueuedCmd[cfd]
 	if ok {
 		if cmdName == "exec" {
-			fmt.Println("Impl the code to execute the code..")
+			out:= server.ProcessQueue(cfd)
+			response = []byte(out)
 		}
 		return response, err
 	}
@@ -453,6 +454,23 @@ func (server *RedisServer) processTimers() {
 	server.timers = activeTimers // Keep only non-expired timers
 }
 
+func (server *RedisServer) ProcessQueue(cfd int) string {
+	qc, ok := server.databaseQueuedCmd[cfd]
+	outa := make([]string, 0)
+	if !ok {
+		fmt.Println("Shouldn't be the case usually...")
+	}
+
+	for _, c := range qc.cmdsInpData {
+		cmdName := strings.ToLower(string(c[0]));
+		_ = cmdName
+
+	}
+	
+	oa := createRESPArray(outa)
+	delete(server.databaseQueuedCmd, cfd)
+	return oa
+}
 
 
 func (server *RedisServer) eventLoopStart() {
