@@ -287,15 +287,15 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			clientConn.Write(response)
 		}
 
-		if timeout == 0 && blockIndex == -1 {
+		if blockIndex == -1 {
+			fmt.Println("timeout provided is: ", timeout, "and to AddTimerFxn internally: ", time.Duration(timeout) * time.Millisecond)
+			server.AddTimer(time.Duration(timeout) * time.Millisecond, callbackFunc)
+		} else {
 			//!Wait for new entryies and write to output, only when something new pops up
 			fmt.Println("Input timeout provided is: ", timeout, " with block as parameter")
 			for _, k := range allKeys {
 				server.database_stream_xread_fxns[k] = StreamCallback{callbackFunc, allKeys}
 			}
-		} else {
-			fmt.Println("timeout provided is: ", timeout, "and to AddTimerFxn internally: ", time.Duration(timeout) * time.Millisecond)
-			server.AddTimer(time.Duration(timeout) * time.Millisecond, callbackFunc)
 	
 		}
 
