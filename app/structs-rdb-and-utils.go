@@ -21,6 +21,7 @@ type ValueTickPair struct {
 type QC struct {
 	started bool
 	cmdsInpData [][][]byte
+	cmdReqSize []int
 }
 
 

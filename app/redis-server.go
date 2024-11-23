@@ -465,10 +465,9 @@ func (server *RedisServer) ProcessQueue(cfd int) string {
 		fmt.Println("Shouldn't be the case usually...")
 	}
 
-	for _, c := range qc.cmdsInpData {
-		cmdName := strings.ToLower(string(c[0]));
-		_ = cmdName
-
+	for i, c := range qc.cmdsInpData {
+		cmdOut, _ := server.RequestHandler(c, qc.cmdReqSize[i], server.clients[cfd])
+		outa = append(outa, string(cmdOut))
 	}
 	
 	oa := createRESPArray(outa)
