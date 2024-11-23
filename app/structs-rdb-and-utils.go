@@ -18,6 +18,12 @@ type ValueTickPair struct {
 	keyType	string
 }
 
+type QC struct {
+	started bool
+	cmdsInpData [][][]byte
+}
+
+
 type FundamentalStreamEntry struct {
 	key string
 	value string

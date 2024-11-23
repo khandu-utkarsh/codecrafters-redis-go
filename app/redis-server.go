@@ -33,6 +33,9 @@ type RedisServer struct {
 	database    map[string]ValueTickPair
 	database_stream map[string]StreamValue
 	database_stream_xread_fxns map[string]StreamCallback
+
+	databaseQueuedCmd map[int]QC
+
 	//!Req, response
 	requestResponseBuffer map[int][]byte	//!Fd tp response
 	forwardingReqBuffer map[int][]byte //!Fd to forwarding req
@@ -51,6 +54,16 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 	var err error
 
 	cmdName := strings.ToLower(string(reqData[0]));
+	cfd, _ := GetTCPConnectionFd(clientConn)
+	qcp, ok := server.databaseQueuedCmd[cfd]	
+	if ok {
+		if cmdName == "exec" {
+			fmt.Println("Impl the code to execute the code..")
+		}
+		return response, err
+	}
+	_ = qcp
+
 	switch cmdName {
 
 	//	------------------------------------------------------------------------------------------  //
@@ -66,6 +79,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 	case "multi":
 		out := "+OK\r\n"
 		response = []byte(out)
+		server.databaseQueuedCmd[cfd] = QC{started: true}	
 
 	//	------------------------------------------------------------------------------------------  //
 	case "echo":
@@ -348,6 +362,7 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		database_stream: make(map[string]StreamValue),
 		requestResponseBuffer: make(map[int][]byte),
 		forwardingReqBuffer: make(map[int][]byte),	
+		databaseQueuedCmd: map[int]QC{},
 		timers: make([]Timer, 0),
 		database_stream_xread_fxns: make(map[string]StreamCallback),
 		rdbDirPath:   rdbDicPath,
