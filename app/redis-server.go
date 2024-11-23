@@ -229,6 +229,8 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 		}
 
 		var allKeys []string
+		fmt.Println("Key index: ", keysIndex, " time index: ", timeIndex)
+
 		for i := keysIndex; i < timeIndex; i++ {
 			currK := string(reqData[i])
 			allKeys = append(allKeys,  currK)
