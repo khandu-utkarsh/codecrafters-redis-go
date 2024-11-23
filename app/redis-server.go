@@ -377,7 +377,7 @@ func (server *RedisServer) processTimers() {
 
 	for _, timer := range server.timers {
 		if timer.expiry.Before(now) {
-			fmt.Println("Timer expired.")
+			fmt.Println("Timer expired: ", timer)
 			timer.callback() // Execute the callback
 		} else {
 			activeTimers = append(activeTimers, timer)
