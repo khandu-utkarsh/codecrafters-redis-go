@@ -169,7 +169,6 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			fmt.Println("Minimum args req are 4")
 		} else {
 			var out string
-			streamKey := string(reqData[1])
 			start := string(reqData[2])
 			if start == "-" {
 				start = "0"
@@ -180,7 +179,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 				end = strconv.Itoa(int(tend))
 			}
 
-			v, ok := server.database_stream[streamKey]
+			v, ok := server.database_stream[string(reqData[1])]
 			if !ok {
 				fmt.Print("Key not present...")
 				//!We should not encounter this in this case.
@@ -202,6 +201,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 	case "xread":
 
 		var blockIndex, keysIndex, timeIndex int
+		blockIndex = -1;
 
 		for i, elem := range reqData {
 			if i == 0 {
@@ -221,49 +221,58 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 				break
 			}
 		}
-		_ = blockIndex
 
-		kc := timeIndex - keysIndex;
-		tc := len(reqData) - timeIndex
-
-		if kc != tc {
-			fmt.Println("WTF")
+		timeout := 0		
+		if blockIndex != -1 {
+			timeout, _ = strconv.Atoi(string(reqData[blockIndex + 1]))
 		}
 
-		var outSteamWise []string
-		tend := time.Now().UnixNano() / int64(time.Millisecond) + 100000
-		end := strconv.Itoa(int(tend))
-		for i := 0; i < kc; i++ {
-			currK := string(reqData[i + keysIndex])
-			currTime := string(reqData[i + timeIndex])
-			fmt.Println("CK: ", currK, " currt: ",currTime)
-			start := currTime
-
-
-			var streamOut string
-			v, ok := server.database_stream[currK]
-			if !ok {
-				fmt.Print("Key not present... in xread, just skipping it for now")
-				continue
-				//!We should not encounter this in this case.
-			} else {
-				var inRangeEntries []StreamEntry
-				for _, entry := range v.entries {
-					if(entry.id >= start && entry.id <= end) {
-						inRangeEntries = append(inRangeEntries, entry)
+		callbackFunc := func() {
+			kc := timeIndex - keysIndex;
+			tc := len(reqData) - timeIndex
+	
+			if kc != tc {
+				fmt.Println("WTF")
+			}
+	
+			var outSteamWise []string
+			tend := time.Now().UnixNano() / int64(time.Millisecond) + 100000
+			end := strconv.Itoa(int(tend))
+			for i := 0; i < kc; i++ {
+				currK := string(reqData[i + keysIndex])
+				currTime := string(reqData[i + timeIndex])
+				fmt.Println("CK: ", currK, " currt: ",currTime)
+				start := currTime
+	
+	
+				var streamOut string
+				v, ok := server.database_stream[currK]
+				if !ok {
+					fmt.Print("Key not present... in xread, just skipping it for now")
+					continue
+					//!We should not encounter this in this case.
+				} else {
+					var inRangeEntries []StreamEntry
+					for _, entry := range v.entries {
+						if(entry.id >= start && entry.id <= end) {
+							inRangeEntries = append(inRangeEntries, entry)
+						}
+					}
+					if len(inRangeEntries ) != 0 {
+						streamOut = createRSEPOutputForStreamValue(inRangeEntries)
 					}
 				}
-				if len(inRangeEntries ) != 0 {
-					streamOut = createRSEPOutputForStreamValue(inRangeEntries)
-				}
+				keyString := createBulkString(currK)
+				currKeyOut := []string{keyString, streamOut}
+				kvout := createRESPArray(currKeyOut)
+				outSteamWise = append(outSteamWise, kvout)
 			}
-			keyString := createBulkString(currK)
-			currKeyOut := []string{keyString, streamOut}
-			kvout := createRESPArray(currKeyOut)
-			outSteamWise = append(outSteamWise, kvout)
+			out := createRESPArray(outSteamWise)
+			response = []byte(out)	
+			clientConn.Write(response)
 		}
-		out := createRESPArray(outSteamWise)
-		response = []byte(out)
+
+		server.AddTimer(time.Duration(timeout) * time.Millisecond, callbackFunc)
 
 		//	------------------------------------------------------------------------------------------  //		
 	default:

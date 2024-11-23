@@ -274,3 +274,4 @@ func generateId(inp string, last string) (bool, string) {
 	}
 	return true, strconv.Itoa(newTime) + "-" + strconv.Itoa(newseq)
 }
+
