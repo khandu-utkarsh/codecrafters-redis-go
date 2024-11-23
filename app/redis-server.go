@@ -171,7 +171,14 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			var out string
 			streamKey := string(reqData[1])
 			start := string(reqData[2])
+			if start == "-" {
+				start = "0"
+			}
 			end := string(reqData[3])
+			if end == "+" {
+				tend := time.Now().UnixNano() / int64(time.Millisecond) + 100000
+				end = strconv.Itoa(int(tend))
+			}
 
 			v, ok := server.database_stream[streamKey]
 			if !ok {
