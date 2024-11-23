@@ -252,7 +252,7 @@ func validateString(inp string, last string) (bool, string) {
 
 func generateId(inp string, last string) (bool, string) {	
 
-	if strings.Index(inp, "*") == -1 {
+	if !strings.Contains(inp, "*") {
 		return false, inp
 	}
 
@@ -266,15 +266,14 @@ func generateId(inp string, last string) (bool, string) {
 	if dashIndex == -1 {
 		inpt = int(time.Now().UnixNano() / int64(time.Millisecond))
 	} else {
-		inpt, _ = strconv.Atoi(inp[:dashIndex])		
-		newTime = inpt
-		if inpt == lt {
-			newseq = ls + 1
-		} else {
-			newseq = 0;
-		}
+		inpt, _ = strconv.Atoi(inp[:dashIndex])
+	}		
+
+	newTime = inpt
+	if inpt == lt {
+		newseq = ls + 1
+	} else {
+		newseq = 0;
 	}
 	return true, strconv.Itoa(newTime) + "-" + strconv.Itoa(newseq)
-
-
 }
