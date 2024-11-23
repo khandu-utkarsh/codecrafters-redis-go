@@ -225,7 +225,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 
 		var allKeys []string
 		for i := keysIndex; i < timeIndex; i++ {
-			currK := string(reqData[i + keysIndex])
+			currK := string(reqData[i])
 			allKeys = append(allKeys,  currK)
 		}
 
