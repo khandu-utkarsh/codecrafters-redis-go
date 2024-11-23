@@ -63,6 +63,10 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			response = make([]byte, 0)
 		}
 
+	case "multi":
+		out := "+OK\r\n"
+		response = []byte(out)
+
 	//	------------------------------------------------------------------------------------------  //
 	case "echo":
 		//!Get byte array of all the rest elements
