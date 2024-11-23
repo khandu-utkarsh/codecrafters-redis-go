@@ -81,6 +81,9 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 		response = []byte(out)
 		server.databaseQueuedCmd[cfd] = QC{started: true}	
 
+	case "exec":
+		out := "-ERR EXEC without MULTI\r\n"
+		response = []byte(out)
 	//	------------------------------------------------------------------------------------------  //
 	case "echo":
 		//!Get byte array of all the rest elements
