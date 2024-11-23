@@ -236,7 +236,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 		for i := 0; i < kc; i++ {
 			currK := string(reqData[i + keysIndex])
 			currTime := string(reqData[i + timeIndex])
-
+			fmt.Println("CK: ", currK, " currt: ",currTime)
 			start := currTime
 
 
