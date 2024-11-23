@@ -32,6 +32,27 @@ func createGetAckString() (string) {
 }
 
 
+func createRSEPOutputForStreamValue(allse []StreamEntry) (string) {
+	var obentrystrings []string
+	for _, entry := range allse {
+		id := entry.id
+		idstring := createBulkString(id)
+		kvps := entry.kvpairs
+		var kvarrays []string
+		for _, kv := range kvps {
+			kout := createBulkString(kv.key)
+			vout := createBulkString(kv.value)
+			kvarrays = append(kvarrays, kout, vout)
+		}
+		entriesArray := createRESPArray(kvarrays)
+		entryString := []string{idstring, entriesArray}
+		earray := createRESPArray(entryString)
+		obentrystrings = append(obentrystrings, earray)
+	}
+	output := createRESPArray(obentrystrings)
+	return output
+}
+
 //	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//
 //!Input fxns
 //	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//	//

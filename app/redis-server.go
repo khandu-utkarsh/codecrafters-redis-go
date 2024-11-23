@@ -162,6 +162,36 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			}
 			response = []byte(out)
 		}
+
+	//	------------------------------------------------------------------------------------------  //		
+	case "xrange":
+		if(len(reqData) < 4) {
+			fmt.Println("Minimum args req are 4")
+		} else {
+			var out string
+			streamKey := string(reqData[1])
+			start := string(reqData[2])
+			end := string(reqData[3])
+
+			v, ok := server.database_stream[streamKey]
+			if !ok {
+				fmt.Print("Key not present...")
+				//!We should not encounter this in this case.
+			} else {
+
+				var inRangeEntries []StreamEntry
+				for i, entry := range v.entries {
+					if(entry.id >= start && entry.id <= end) {
+						inRangeEntries = append(inRangeEntries, entry)
+					}
+				}
+				if len(inRangeEntries ) != 0 {
+					out = createRSEPOutputForStreamValue(inRangeEntries)
+				}
+			}
+			response = []byte(out)
+		}
+
 	//	------------------------------------------------------------------------------------------  //		
 	default:
 		response, err = server.state.HandleRequest(reqData, reqSize, server, clientConn)
