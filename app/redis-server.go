@@ -32,6 +32,7 @@ type RedisServer struct {
 	clients     map[int]*net.TCPConn
 	database    map[string]ValueTickPair
 	database_stream map[string]StreamValue
+	database_stream_xread_fxns map[string]StreamCallback
 	//!Req, response
 	requestResponseBuffer map[int][]byte	//!Fd tp response
 	forwardingReqBuffer map[int][]byte //!Fd to forwarding req
@@ -222,6 +223,13 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			}
 		}
 
+		var allKeys []string
+		for i := keysIndex; i < timeIndex; i++ {
+			currK := string(reqData[i + keysIndex])
+			allKeys = append(allKeys,  currK)
+		}
+
+
 		timeout := 0		
 		if blockIndex != -1 {
 			timeout, _ = strconv.Atoi(string(reqData[blockIndex + 1]))
@@ -278,8 +286,21 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			response = []byte(out)	
 			clientConn.Write(response)
 		}
-		fmt.Println("timeout provided is: ", timeout, "and to AddTimerFxn internally: ", time.Duration(timeout) * time.Millisecond)
-		server.AddTimer(time.Duration(timeout) * time.Millisecond, callbackFunc)
+
+		if timeout == 0 && blockIndex == -1 {
+			//!Wait for new entryies and write to output, only when something new pops up
+			fmt.Println("Input timeout provided is: ", timeout, " with block as parameter")
+			for _, k := range allKeys {
+				server.database_stream_xread_fxns[k] = StreamCallback{callbackFunc, allKeys}
+			}
+		} else {
+			fmt.Println("timeout provided is: ", timeout, "and to AddTimerFxn internally: ", time.Duration(timeout) * time.Millisecond)
+			server.AddTimer(time.Duration(timeout) * time.Millisecond, callbackFunc)
+	
+		}
+
+
+
 
 		//	------------------------------------------------------------------------------------------  //		
 	default:
@@ -307,7 +328,8 @@ func NewRedisServer(port int, masterAddress string, rdbDicPath string, rdbFilePa
 		database_stream: make(map[string]StreamValue),
 		requestResponseBuffer: make(map[int][]byte),
 		forwardingReqBuffer: make(map[int][]byte),	
-		timers: make([]Timer, 0),	
+		timers: make([]Timer, 0),
+		database_stream_xread_fxns: make(map[string]StreamCallback),
 		rdbDirPath:   rdbDicPath,
 		rdbFileName:  rdbFilePath,
 		master_replid: "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",

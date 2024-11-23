@@ -33,6 +33,11 @@ type StreamValue struct {
 	entries []StreamEntry
 }
 
+type StreamCallback struct {
+    Callback func()
+    Streams  []string
+}
+
 // GetTCPListenerFd takes a *net.TCPListener and returns its underlying file descriptor.
 func GetTCPListenerFd(tcpListener *net.TCPListener) (int, error) {
 	conn, err := tcpListener.SyscallConn()
