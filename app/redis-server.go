@@ -233,7 +233,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			currK := string(reqData[i])
 			allKeys = append(allKeys,  currK)
 		}
-
+		
 		var allStartTimes []string
 		if string(reqData[timeIndex]) == "$" {
 			for _, k := range allKeys {
@@ -249,6 +249,8 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			}	
 		}
 
+		fmt.Println("All keys: ", allKeys)
+		fmt.Println("All start time: ", allStartTimes)
 		callbackFunc := func() {
 			fmt.Println("Started to execute the callback of xread: ")
 			var outSteamWise []string
