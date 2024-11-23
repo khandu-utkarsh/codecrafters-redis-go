@@ -287,7 +287,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			clientConn.Write(response)
 		}
 
-		if blockIndex == -1 {
+		if blockIndex != -1 {
 			fmt.Println("timeout provided is: ", timeout, "and to AddTimerFxn internally: ", time.Duration(timeout) * time.Millisecond)
 			server.AddTimer(time.Duration(timeout) * time.Millisecond, callbackFunc)
 		} else {
