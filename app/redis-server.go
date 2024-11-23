@@ -223,36 +223,47 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			}
 		}
 
+		timeout := 0		
+		if blockIndex != -1 {
+			timeout, _ = strconv.Atoi(string(reqData[blockIndex + 1]))
+		}
+
 		var allKeys []string
 		for i := keysIndex; i < timeIndex; i++ {
 			currK := string(reqData[i])
 			allKeys = append(allKeys,  currK)
 		}
 
-
-		timeout := 0		
-		if blockIndex != -1 {
-			timeout, _ = strconv.Atoi(string(reqData[blockIndex + 1]))
+		var allStartTimes []string
+		if string(reqData[timeIndex]) == "$" {
+			for _, k := range allKeys {
+				ls := len(server.database_stream[k].entries) - 1
+				lastOne := server.database_stream[k].entries[ls].id
+				allStartTimes = append(allStartTimes, lastOne)
+			}
+		} else {
+			for i := timeIndex; i < len(reqData); i++ {
+				currTime := string(reqData[i])
+				start := currTime
+				allStartTimes = append(allStartTimes, start)
+			}	
 		}
 
+
+
+
+
+
+
 		callbackFunc := func() {
-			kc := timeIndex - keysIndex;
-			tc := len(reqData) - timeIndex
-	
-			if kc != tc {
-				fmt.Println("WTF")
-			}
-	
 			var outSteamWise []string
 			tend := time.Now().UnixNano() / int64(time.Millisecond) + 100000
 			end := strconv.Itoa(int(tend))
 			nothingFound := true
-			for i := 0; i < kc; i++ {
-				currK := string(reqData[i + keysIndex])
-				currTime := string(reqData[i + timeIndex])
-				fmt.Println("CK: ", currK, " currt: ",currTime)
-				start := currTime
-	
+			for i:= 0; i < len(allKeys); i++ {
+				currK := allKeys[i]
+				start := allStartTimes[i]
+				fmt.Println("CK: ", currK, " start time: ",start)
 	
 				var streamOut string
 				v, ok := server.database_stream[currK]
