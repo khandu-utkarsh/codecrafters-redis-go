@@ -92,7 +92,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 		server.databaseQueuedCmd[cfd] = QC{started: true}	
 
 	case "discard":
-		out := "-ERR ERR DISCARD without MULTI\r\n"
+		out := "-ERR DISCARD without MULTI\r\n"
 		response = []byte(out)
 
 	case "exec":
