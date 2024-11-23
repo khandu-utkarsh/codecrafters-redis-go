@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ValueTickPair for value and time pair
@@ -245,5 +246,35 @@ func validateString(inp string, last string) (bool, string) {
 	}
 	return false, "-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n"
 	
+
+}
+
+
+func generateId(inp string, last string) (bool, string) {	
+
+	if strings.Index(inp, "*") == -1 {
+		return false, inp
+	}
+
+	lt, ls := splitSteamId(last)
+
+	var newTime int
+	var newseq int	
+
+	dashIndex := strings.Index(inp, "-")
+	var inpt int
+	if dashIndex == -1 {
+		inpt = int(time.Now().UnixNano() / int64(time.Millisecond))
+	} else {
+		inpt, _ = strconv.Atoi(inp[:dashIndex])		
+		newTime = inpt
+		if inpt == lt {
+			newseq = ls + 1
+		} else {
+			newseq = 0;
+		}
+	}
+	return true, strconv.Itoa(newTime) + "-" + strconv.Itoa(newseq)
+
 
 }

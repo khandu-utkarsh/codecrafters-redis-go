@@ -97,8 +97,10 @@ func (r *ReplicaState) HandleRequest(reqData [][]byte, reqSize int, server *Redi
 			if ok {
 				lastEntryId = sv.entries[len(sv.entries) - 1].id
 			}
+			_, entryId = generateId(entryId, lastEntryId)
 			validated, _ := validateString(entryId, lastEntryId)
 			if(validated) {
+				sentry.id = entryId
 				sv.entries = append(sv.entries, sentry)
 				server.database_stream[skey] = sv
 				//out = createBulkString(entryId);					
