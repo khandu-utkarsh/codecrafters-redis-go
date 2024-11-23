@@ -249,12 +249,6 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			}	
 		}
 
-
-
-
-
-
-
 		callbackFunc := func() {
 			var outSteamWise []string
 			tend := time.Now().UnixNano() / int64(time.Millisecond) + 100000
