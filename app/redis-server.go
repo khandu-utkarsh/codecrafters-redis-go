@@ -238,6 +238,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			var outSteamWise []string
 			tend := time.Now().UnixNano() / int64(time.Millisecond) + 100000
 			end := strconv.Itoa(int(tend))
+			nothingFound := true
 			for i := 0; i < kc; i++ {
 				currK := string(reqData[i + keysIndex])
 				currTime := string(reqData[i + timeIndex])
@@ -254,11 +255,12 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 				} else {
 					var inRangeEntries []StreamEntry
 					for _, entry := range v.entries {
-						if(entry.id >= start && entry.id <= end) {
+						if(entry.id > start && entry.id <= end) {
 							inRangeEntries = append(inRangeEntries, entry)
 						}
 					}
 					if len(inRangeEntries ) != 0 {
+						nothingFound = false						
 						streamOut = createRSEPOutputForStreamValue(inRangeEntries)
 					}
 				}
@@ -267,11 +269,16 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 				kvout := createRESPArray(currKeyOut)
 				outSteamWise = append(outSteamWise, kvout)
 			}
-			out := createRESPArray(outSteamWise)
+			var out string
+			if nothingFound {
+				out = "$-1\r\n"
+			} else {
+				out = createRESPArray(outSteamWise)
+			}
 			response = []byte(out)	
 			clientConn.Write(response)
 		}
-
+		fmt.Println("timeout provided is: ", timeout, "and to AddTimerFxn internally: ", time.Duration(timeout) * time.Millisecond)
 		server.AddTimer(time.Duration(timeout) * time.Millisecond, callbackFunc)
 
 		//	------------------------------------------------------------------------------------------  //		
