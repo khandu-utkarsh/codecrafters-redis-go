@@ -60,7 +60,9 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 		var out string
 		if cmdName == "exec" {
 			out= server.ProcessQueue(cfd)
-
+		} else if cmdName == "discard"{
+			delete(server.databaseQueuedCmd, cfd)
+			out = "+OK\r\n"			
 		} else {
 			qcp.cmdReqSize = append(qcp.cmdReqSize, reqSize)
 			qcp.cmdsInpData = append(qcp.cmdsInpData, reqData)
@@ -88,6 +90,10 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 		out := "+OK\r\n"
 		response = []byte(out)
 		server.databaseQueuedCmd[cfd] = QC{started: true}	
+
+	case "discard":
+		out := "-ERR ERR DISCARD without MULTI\r\n"
+		response = []byte(out)
 
 	case "exec":
 		out := "-ERR EXEC without MULTI\r\n"
