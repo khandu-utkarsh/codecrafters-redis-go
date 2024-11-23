@@ -108,6 +108,34 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 		}
 
 	//	------------------------------------------------------------------------------------------  //
+	case "incr": //!Differnt behavior for master and replica
+		if(len(reqData) < 2) {
+			fmt.Println("Minimum args req are 2")
+		} else {
+			key := string(reqData[1]);
+			
+			vt, ok := server.database[key]			
+			if !ok {
+				vt = ValueTickPair{value: "1", tickUnixNanoSec: -1}				
+			} else {
+				iv, err := strconv.Atoi(vt.value)
+				if err == nil {
+					fmt.Println("Have to implment for this case.")
+				} else {
+					iv++;
+					vt.value = strconv.Itoa(iv)
+				}
+			}
+			server.database[key] = vt;
+			fmt.Println("Here in incr: ", server.database)		
+			out := ":" + vt.value + "\r\n"	
+			response = []byte(out)
+			server.cmdProcessed ++;
+		}
+
+
+
+	//	------------------------------------------------------------------------------------------  //
 	case "xadd":
 		if(len(reqData) < 2) {
 			fmt.Println("Min agrs needed by ", string(reqData[0]), " are more then 2.")
