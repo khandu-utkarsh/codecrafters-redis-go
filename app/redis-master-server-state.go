@@ -116,13 +116,15 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			
 			vt, ok := server.database[key]			
 			if !ok {
-				vt = ValueTickPair{value: "1", tickUnixNanoSec: -1}				
+				vt = ValueTickPair{value: "1", tickUnixNanoSec: -1}
 			} else {
 				iv, err := strconv.Atoi(vt.value)
+				fmt.Println("Value of iv before: ", iv)
 				if err == nil {
 					fmt.Println("Have to implment for this case.")
 				} else {
 					iv++;
+					fmt.Println("Value of iv after: ", iv)
 					vt.value = strconv.Itoa(iv)
 				}
 			}
