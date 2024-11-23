@@ -123,16 +123,16 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 				iv, err := strconv.Atoi(vt.value)
 				if err != nil {
 					out = "-ERR value is not an integer or out of range\r\n"
-					fmt.Println("Have to implment for this case.")
 				} else {
 					iv++;
-					fmt.Println("Value of iv after: ", iv)
 					vt.value = strconv.Itoa(iv)
 				}
 			}
 			server.database[key] = vt;
-			fmt.Println("Here in incr: ", server.database)		
-			out = ":" + vt.value + "\r\n"	
+			fmt.Println("Here in incr: ", server.database)
+			if out == ""{
+				out = ":" + vt.value + "\r\n"	
+			}
 			response = []byte(out)
 			server.cmdProcessed ++;
 		}
