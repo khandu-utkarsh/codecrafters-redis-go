@@ -203,6 +203,7 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 
 		var blockIndex, keysIndex, timeIndex int
 		blockIndex = -1;
+		timeIndex = -1;
 
 		for i, elem := range reqData {
 			if i == 0 {
@@ -221,6 +222,10 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 				timeIndex = i
 				break
 			}
+		}
+
+		if timeIndex == -1 {
+			timeIndex = len(reqData) - 1			
 		}
 
 		timeout := 0		
