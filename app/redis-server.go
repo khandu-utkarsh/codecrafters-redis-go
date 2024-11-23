@@ -62,6 +62,8 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			out= server.ProcessQueue(cfd)
 
 		} else {
+			qcp.cmdReqSize = append(qcp.cmdReqSize, reqSize)
+			qcp.cmdsInpData = append(qcp.cmdsInpData, reqData)
 			out = "+QUEUED\r\n"
 		}
 		response = []byte(out)
