@@ -251,12 +251,9 @@ func validateString(inp string, last string) (bool, string) {
 
 
 func generateId(inp string, last string) (bool, string) {	
-	fmt.Println("Entered here")
 	if !strings.Contains(inp, "*") {
-		fmt.Println("Entered here1")
 		return false, inp
 	}
-	fmt.Println("Entered here2")
 	lt, ls := splitSteamId(last)
 
 	var newTime int
@@ -265,21 +262,15 @@ func generateId(inp string, last string) (bool, string) {
 	dashIndex := strings.Index(inp, "-")
 	var inpt int
 	if dashIndex == -1 {
-		fmt.Println("Entered here3")
 		inpt = int(time.Now().UnixNano() / int64(time.Millisecond))
 	} else {
-		fmt.Println("Entered here4")
 		inpt, _ = strconv.Atoi(inp[:dashIndex])
 	}		
-	fmt.Println("Entered here5")
 	newTime = inpt
 	if inpt == lt {
-		fmt.Println("Entered here6")
 		newseq = ls + 1
 	} else {
-		fmt.Println("Entered here7")
 		newseq = 0;
 	}
-	fmt.Println("Entered here8")
 	return true, strconv.Itoa(newTime) + "-" + strconv.Itoa(newseq)
 }
