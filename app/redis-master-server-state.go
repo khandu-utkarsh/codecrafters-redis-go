@@ -120,7 +120,7 @@ func (m *MasterState) HandleRequest(reqData [][]byte, reqSize int, server *Redis
 			} else {
 				iv, err := strconv.Atoi(vt.value)
 				fmt.Println("Value of iv before: ", iv)
-				if err == nil {
+				if err != nil {
 					fmt.Println("Have to implment for this case.")
 				} else {
 					iv++;
