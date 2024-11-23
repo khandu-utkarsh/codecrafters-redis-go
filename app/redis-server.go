@@ -57,10 +57,14 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 	cfd, _ := GetTCPConnectionFd(clientConn)
 	qcp, ok := server.databaseQueuedCmd[cfd]
 	if ok {
+		var out string
 		if cmdName == "exec" {
-			out:= server.ProcessQueue(cfd)
-			response = []byte(out)
+			out= server.ProcessQueue(cfd)
+
+		} else {
+			out = "+QUEUED\r\n"
 		}
+		response = []byte(out)
 		return response, err
 	}
 	_ = qcp
