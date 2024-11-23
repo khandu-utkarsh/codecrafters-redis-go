@@ -258,9 +258,9 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 				}
 			}
 			keyString := createBulkString(currK)
-
 			currKeyOut := []string{keyString, streamOut}
-			outSteamWise = append(outSteamWise, currKeyOut...)
+			kvout := createRESPArray(currKeyOut)
+			outSteamWise = append(outSteamWise, kvout)
 		}
 		out := createRESPArray(outSteamWise)
 		response = []byte(out)
