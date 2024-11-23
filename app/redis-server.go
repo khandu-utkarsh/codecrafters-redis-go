@@ -199,7 +199,73 @@ func (server *RedisServer) RequestHandler(reqData [][]byte, reqSize int, clientC
 			response = []byte(out)
 		}
 
-	//	------------------------------------------------------------------------------------------  //		
+	case "xread":
+
+		var blockIndex, keysIndex, timeIndex int
+
+		for i, elem := range reqData {
+			if i == 0 {
+				continue
+			}
+			se := string(elem)
+
+			if(strings.ToLower(se) == "block") {
+				blockIndex = i;
+			}
+			if(se == "streams") {
+				keysIndex = i + 1
+			} 
+			
+			if strings.Contains(se, "-") {
+				timeIndex = i
+				break
+			}
+		}
+		_ = blockIndex
+
+		kc := timeIndex - keysIndex;
+		tc := len(reqData) - timeIndex
+
+		if kc != tc {
+			fmt.Println("WTF")
+		}
+
+		var outSteamWise []string
+		tend := time.Now().UnixNano() / int64(time.Millisecond) + 100000
+		end := strconv.Itoa(int(tend))
+		for i := 0; i < kc; i++ {
+			currK := string(reqData[i + keysIndex])
+			currTime := string(reqData[i + timeIndex])
+
+			start := currTime
+
+
+			var streamOut string
+			v, ok := server.database_stream[currK]
+			if !ok {
+				fmt.Print("Key not present... in xread, just skipping it for now")
+				continue
+				//!We should not encounter this in this case.
+			} else {
+				var inRangeEntries []StreamEntry
+				for _, entry := range v.entries {
+					if(entry.id >= start && entry.id <= end) {
+						inRangeEntries = append(inRangeEntries, entry)
+					}
+				}
+				if len(inRangeEntries ) != 0 {
+					streamOut = createRSEPOutputForStreamValue(inRangeEntries)
+				}
+			}
+			keyString := createBulkString(currK)
+
+			currKeyOut := []string{keyString, streamOut}
+			outSteamWise = append(outSteamWise, currKeyOut...)
+		}
+		out := createRESPArray(outSteamWise)
+		response = []byte(out)
+
+		//	------------------------------------------------------------------------------------------  //		
 	default:
 		response, err = server.state.HandleRequest(reqData, reqSize, server, clientConn)
 	}
